@@ -1,0 +1,402 @@
+import { useState } from "react";
+import { SurveyPackage, SurveyForm, SurveyQuestion, QuestionType } from "@/types/survey";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { 
+  Plus, 
+  Settings, 
+  FileCode, 
+  Trash2, 
+  MoreVertical,
+  FileSpreadsheet,
+  Copy,
+  ArrowUp,
+  ArrowDown
+} from "lucide-react";
+import QuestionTypeSelector from "./QuestionTypeSelector";
+import QuestionCard from "./QuestionCard";
+import QuestionEditor from "./QuestionEditor";
+import FormManifestEditor from "./FormManifestEditor";
+import XmlPreview from "./XmlPreview";
+
+const createDefaultQuestion = (type: QuestionType): SurveyQuestion => ({
+  id: crypto.randomUUID(),
+  type,
+  fieldname: `field_${Date.now()}`,
+  fieldtype: type === 'date' ? 'date' : type === 'datetime' ? 'datetime' : type === 'information' ? 'n/a' : 'text',
+  text: '',
+  responses: ['radio', 'checkbox', 'combobox'].includes(type) ? [] : undefined,
+});
+
+const createDefaultForm = (): SurveyForm => ({
+  id: crypto.randomUUID(),
+  tablename: `form_${Date.now()}`,
+  displayname: 'New Form',
+  displayOrder: 0,
+  autoStartRepeat: 0,
+  repeatEnforceCount: 1,
+  questions: [],
+});
+
+interface SurveyDesignerProps {
+  initialPackage?: SurveyPackage;
+  onSave?: (pkg: SurveyPackage) => void;
+}
+
+const SurveyDesigner = ({ initialPackage, onSave }: SurveyDesignerProps) => {
+  const [surveyPackage, setSurveyPackage] = useState<SurveyPackage>(
+    initialPackage || {
+      id: crypto.randomUUID(),
+      name: 'New Survey Package',
+      version: '1.0',
+      forms: [createDefaultForm()],
+    }
+  );
+  
+  const [activeFormId, setActiveFormId] = useState<string>(surveyPackage.forms[0]?.id || '');
+  const [showAddQuestion, setShowAddQuestion] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<SurveyQuestion | null>(null);
+  const [showQuestionEditor, setShowQuestionEditor] = useState(false);
+  const [showFormSettings, setShowFormSettings] = useState(false);
+  const [showXmlPreview, setShowXmlPreview] = useState(false);
+  const [deleteFormId, setDeleteFormId] = useState<string | null>(null);
+
+  const activeForm = surveyPackage.forms.find(f => f.id === activeFormId);
+
+  const updatePackage = (updates: Partial<SurveyPackage>) => {
+    const updated = { ...surveyPackage, ...updates };
+    setSurveyPackage(updated);
+    onSave?.(updated);
+  };
+
+  const updateForm = (formId: string, updates: Partial<SurveyForm>) => {
+    updatePackage({
+      forms: surveyPackage.forms.map(f => 
+        f.id === formId ? { ...f, ...updates } : f
+      )
+    });
+  };
+
+  const addForm = () => {
+    const newForm = createDefaultForm();
+    newForm.displayOrder = surveyPackage.forms.length;
+    updatePackage({ forms: [...surveyPackage.forms, newForm] });
+    setActiveFormId(newForm.id);
+  };
+
+  const deleteForm = (formId: string) => {
+    const remaining = surveyPackage.forms.filter(f => f.id !== formId);
+    updatePackage({ forms: remaining });
+    if (activeFormId === formId && remaining.length > 0) {
+      setActiveFormId(remaining[0].id);
+    }
+    setDeleteFormId(null);
+  };
+
+  const duplicateForm = (form: SurveyForm) => {
+    const newForm: SurveyForm = {
+      ...form,
+      id: crypto.randomUUID(),
+      tablename: `${form.tablename}_copy`,
+      displayname: `${form.displayname} (Copy)`,
+      questions: form.questions.map(q => ({ ...q, id: crypto.randomUUID() })),
+    };
+    updatePackage({ forms: [...surveyPackage.forms, newForm] });
+    setActiveFormId(newForm.id);
+  };
+
+  const handleAddQuestion = (type: QuestionType) => {
+    if (!activeForm) return;
+    const newQuestion = createDefaultQuestion(type);
+    updateForm(activeFormId, {
+      questions: [...activeForm.questions, newQuestion]
+    });
+    setShowAddQuestion(false);
+    setEditingQuestion(newQuestion);
+    setShowQuestionEditor(true);
+  };
+
+  const handleSaveQuestion = (question: SurveyQuestion) => {
+    if (!activeForm) return;
+    updateForm(activeFormId, {
+      questions: activeForm.questions.map(q => 
+        q.id === question.id ? question : q
+      )
+    });
+  };
+
+  const handleDuplicateQuestion = (question: SurveyQuestion) => {
+    if (!activeForm) return;
+    const index = activeForm.questions.findIndex(q => q.id === question.id);
+    const newQuestion = {
+      ...question,
+      id: crypto.randomUUID(),
+      fieldname: `${question.fieldname}_copy`,
+    };
+    const newQuestions = [...activeForm.questions];
+    newQuestions.splice(index + 1, 0, newQuestion);
+    updateForm(activeFormId, { questions: newQuestions });
+  };
+
+  const handleDeleteQuestion = (questionId: string) => {
+    if (!activeForm) return;
+    updateForm(activeFormId, {
+      questions: activeForm.questions.filter(q => q.id !== questionId)
+    });
+  };
+
+  const moveQuestion = (questionId: string, direction: 'up' | 'down') => {
+    if (!activeForm) return;
+    const index = activeForm.questions.findIndex(q => q.id === questionId);
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === activeForm.questions.length - 1)
+    ) return;
+
+    const newQuestions = [...activeForm.questions];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]];
+    updateForm(activeFormId, { questions: newQuestions });
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Package Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Input
+            value={surveyPackage.name}
+            onChange={(e) => updatePackage({ name: e.target.value })}
+            className="text-lg font-semibold w-64"
+          />
+          <Badge variant="outline">v{surveyPackage.version}</Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowXmlPreview(true)}>
+            <FileCode className="h-4 w-4 mr-2" />
+            Preview & Export
+          </Button>
+        </div>
+      </div>
+
+      {/* Forms Tabs */}
+      <Tabs value={activeFormId} onValueChange={setActiveFormId} className="flex-1 flex flex-col">
+        <div className="flex items-center gap-2 mb-4">
+          <TabsList className="h-auto flex-wrap">
+            {surveyPackage.forms.map((form) => (
+              <TabsTrigger key={form.id} value={form.id} className="flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4" />
+                {form.displayname}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <Button variant="outline" size="sm" onClick={addForm}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {surveyPackage.forms.map((form) => (
+          <TabsContent key={form.id} value={form.id} className="flex-1 flex flex-col mt-0">
+            {/* Form Header */}
+            <Card className="mb-4 bg-card border-border">
+              <CardHeader className="py-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">{form.displayname}</CardTitle>
+                    <CardDescription>
+                      {form.tablename}.xml • {form.questions.length} questions
+                      {form.parenttable && ` • Child of ${form.parenttable}`}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowFormSettings(true)}>
+                      <Settings className="h-4 w-4 mr-1" />
+                      Settings
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => duplicateForm(form)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Duplicate Form
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => setDeleteFormId(form.id)}
+                          className="text-destructive"
+                          disabled={surveyPackage.forms.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Form
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+
+            {/* Questions List */}
+            <ScrollArea className="flex-1">
+              <div className="space-y-3 pr-4">
+                {form.questions.map((question, index) => (
+                  <div key={question.id} className="flex items-start gap-2">
+                    <div className="flex flex-col gap-1 pt-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => moveQuestion(question.id, 'up')}
+                        disabled={index === 0}
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => moveQuestion(question.id, 'down')}
+                        disabled={index === form.questions.length - 1}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="flex-1">
+                      <QuestionCard
+                        question={question}
+                        index={index}
+                        onEdit={() => {
+                          setEditingQuestion(question);
+                          setShowQuestionEditor(true);
+                        }}
+                        onDuplicate={() => handleDuplicateQuestion(question)}
+                        onDelete={() => handleDeleteQuestion(question.id)}
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {form.questions.length === 0 && !showAddQuestion && (
+                  <Card className="bg-muted/30 border-dashed border-2">
+                    <CardContent className="py-8 text-center">
+                      <p className="text-muted-foreground mb-4">
+                        No questions yet. Add your first question to get started.
+                      </p>
+                      <Button onClick={() => setShowAddQuestion(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Question
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Add Question Section */}
+                {showAddQuestion ? (
+                  <Card className="bg-card border-border">
+                    <CardHeader>
+                      <CardTitle className="text-base">Select Question Type</CardTitle>
+                      <CardDescription>Choose the type of input for this question</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <QuestionTypeSelector onSelect={handleAddQuestion} />
+                      <Button 
+                        variant="ghost" 
+                        className="mt-4 w-full"
+                        onClick={() => setShowAddQuestion(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : form.questions.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-dashed"
+                    onClick={() => setShowAddQuestion(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Question
+                  </Button>
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      {/* Question Editor Sheet */}
+      <QuestionEditor
+        question={editingQuestion}
+        allQuestions={activeForm?.questions || []}
+        open={showQuestionEditor}
+        onOpenChange={setShowQuestionEditor}
+        onSave={handleSaveQuestion}
+      />
+
+      {/* Form Settings Sheet */}
+      {activeForm && (
+        <FormManifestEditor
+          form={activeForm}
+          allForms={surveyPackage.forms}
+          open={showFormSettings}
+          onOpenChange={setShowFormSettings}
+          onSave={(updatedForm) => updateForm(activeFormId, updatedForm)}
+        />
+      )}
+
+      {/* XML Preview Dialog */}
+      <XmlPreview
+        surveyPackage={surveyPackage}
+        currentForm={activeForm || null}
+        open={showXmlPreview}
+        onOpenChange={setShowXmlPreview}
+      />
+
+      {/* Delete Form Confirmation */}
+      <AlertDialog open={!!deleteFormId} onOpenChange={() => setDeleteFormId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Form?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the form and all its questions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteFormId && deleteForm(deleteFormId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default SurveyDesigner;

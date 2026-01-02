@@ -96,9 +96,11 @@ const Surveys = () => {
               <Upload className="h-4 w-4 mr-2" />
               Import
             </Button>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Survey
+            <Button asChild>
+              <a href="/dashboard/surveys/designer">
+                <Plus className="h-4 w-4 mr-2" />
+                New Survey
+              </a>
             </Button>
           </div>
         </div>
