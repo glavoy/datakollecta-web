@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Surveys from "./pages/Surveys";
+import SurveyDesignerPage from "./pages/SurveyDesignerPage";
 import Teams from "./pages/Teams";
 import DataView from "./pages/DataView";
 import SettingsPage from "./pages/SettingsPage";
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/projects" element={<Projects />} />
           <Route path="/dashboard/surveys" element={<Surveys />} />
+          <Route path="/dashboard/surveys/designer" element={<SurveyDesignerPage />} />
           <Route path="/dashboard/teams" element={<Teams />} />
           <Route path="/dashboard/data" element={<DataView />} />
           <Route path="/dashboard/settings" element={<SettingsPage />} />
