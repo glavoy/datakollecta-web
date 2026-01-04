@@ -10,7 +10,7 @@ import { surveyService } from "@/services/surveyService";
 import { SurveyPackage } from "@/types/survey";
 
 const SurveyDesignerPage = () => {
-  const { slug, surveyId } = useParams<{ slug: string; surveyId?: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -20,39 +20,55 @@ const SurveyDesignerPage = () => {
 
   useEffect(() => {
     const initialize = async () => {
-      if (!user) return;
+      if (!user || !slug) return;
 
       try {
         setLoading(true);
         
-        // 1. Fetch project if slug is present
-        if (slug) {
-          const { data: projectData, error: projectError } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('slug', slug)
-            .single();
+        // 1. Fetch project ID from slug
+        const { data: projectData, error: projectError } = await supabase
+          .from('projects')
+          .select('id, name')
+          .eq('slug', slug)
+          .single();
 
-          if (projectError) {
-            if (projectError.code === 'PGRST116') {
-              toast({
-                title: "Project not found",
-                description: "This project doesn't exist or you don't have access to it.",
-                variant: "destructive",
-              });
-              navigate('/dashboard/projects');
-              return;
-            }
-            throw projectError;
+        if (projectError) {
+          if (projectError.code === 'PGRST116') {
+            toast({
+              title: "Project not found",
+              description: "This project doesn't exist or you don't have access to it.",
+              variant: "destructive",
+            });
+            navigate('/dashboard/projects');
+            return;
           }
-          setProjectId(projectData.id);
+          throw projectError;
+        }
+        
+        const pid = projectData.id;
+        setProjectId(pid);
+
+        // 2. Fetch existing protocol/survey forms for this project
+        // If no forms exist yet, it will return an empty list in the package
+        try {
+          const pkg = await surveyService.getSurveyPackage(pid);
+          // If the project name differs from the one in state (rare), we can sync it here
+          // but mainly we want the forms.
+          setInitialPackage(pkg);
+        } catch (err) {
+          // If getting package fails (maybe CRFs table empty?), we might just start fresh.
+          // But surveyService.getSurveyPackage should handle empty CRFs gracefully.
+          console.log('No existing protocol found or error loading:', err);
+          
+          // Fallback: Start with basic project info
+          setInitialPackage({
+            id: pid,
+            name: projectData.name,
+            version: '1.0',
+            forms: []
+          });
         }
 
-        // 2. Fetch survey package if surveyId is present
-        if (surveyId) {
-          const pkg = await surveyService.getSurveyPackage(surveyId);
-          setInitialPackage(pkg);
-        }
       } catch (error: any) {
         console.error('Error initializing designer:', error);
         toast({
@@ -66,7 +82,7 @@ const SurveyDesignerPage = () => {
     };
 
     initialize();
-  }, [slug, surveyId, user]);
+  }, [slug, user]);
 
   if (loading) {
     return (

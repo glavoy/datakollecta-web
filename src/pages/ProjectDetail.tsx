@@ -14,7 +14,8 @@ import {
   Settings,
   Loader2,
   Edit2,
-  ExternalLink
+  FileCode,
+  ListChecks
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -29,14 +30,8 @@ interface Project {
   created_at: string;
   updated_at: string;
   created_by: string;
-}
-
-interface SurveyPackage {
-  id: string;
-  name: string;
-  version: string;
-  status: string;
-  created_at: string;
+  version?: string;
+  status?: string;
 }
 
 const ProjectDetail = () => {
@@ -45,7 +40,7 @@ const ProjectDetail = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [project, setProject] = useState<Project | null>(null);
-  const [surveys, setSurveys] = useState<SurveyPackage[]>([]);
+  const [crfCount, setCrfCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -82,15 +77,14 @@ const ProjectDetail = () => {
 
       setProject(projectData);
 
-      // 2. Fetch surveys for this project
-      const { data: surveysData, error: surveysError } = await supabase
-        .from('survey_packages')
-        .select('id, name, version, status, created_at')
-        .eq('project_id', projectData.id)
-        .order('created_at', { ascending: false });
+      // 2. Count CRFs (Forms)
+      const { count, error: countError } = await supabase
+        .from('crfs')
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', projectData.id);
 
-      if (surveysError) throw surveysError;
-      setSurveys(surveysData || []);
+      if (countError) throw countError;
+      setCrfCount(count || 0);
 
     } catch (error: any) {
       console.error('Error fetching project data:', error);
@@ -155,12 +149,12 @@ const ProjectDetail = () => {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Surveys</CardTitle>
-              <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Forms (CRFs)</CardTitle>
+              <ListChecks className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{surveys.length}</div>
-              <p className="text-xs text-muted-foreground">Active data collection forms</p>
+              <div className="text-2xl font-bold">{crfCount}</div>
+              <p className="text-xs text-muted-foreground">Active questionnaires</p>
             </CardContent>
           </Card>
 
@@ -171,7 +165,7 @@ const ProjectDetail = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">Total data collected</p>
+              <p className="text-xs text-muted-foreground">Total records</p>
             </CardContent>
           </Card>
 
@@ -182,84 +176,76 @@ const ProjectDetail = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">1</div>
-              <p className="text-xs text-muted-foreground">Active collectors</p>
+              <p className="text-xs text-muted-foreground">Field workers</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Tabs for different sections */}
-        <Tabs defaultValue="surveys" className="space-y-4">
+        <Tabs defaultValue="design" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="surveys">Surveys</TabsTrigger>
+            <TabsTrigger value="design">Study Design</TabsTrigger>
             <TabsTrigger value="teams">Teams</TabsTrigger>
             <TabsTrigger value="data">Data & Submissions</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="surveys" className="space-y-4">
+          <TabsContent value="design" className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold">Surveys</h2>
-                <p className="text-sm text-muted-foreground">Create and manage data collection forms</p>
+                <h2 className="text-xl font-semibold">Study Protocol & Forms</h2>
+                <p className="text-sm text-muted-foreground">Manage your CRFs and data dictionary</p>
               </div>
-              <Button onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Survey
-              </Button>
             </div>
 
-            {surveys.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {surveys.map((survey) => (
-                  <Card key={survey.id} className="hover:border-primary/50 transition-colors">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-lg">{survey.name}</CardTitle>
-                        <Badge variant="outline">v{survey.version}</Badge>
-                      </div>
-                      <CardDescription>
-                        Created {new Date(survey.created_at).toLocaleDateString()}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Badge variant={survey.status === 'ready' ? 'default' : 'secondary'}>
-                          {survey.status}
-                        </Badge>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1"
-                          onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/${survey.id}`)}
-                        >
-                          <Edit2 className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" className="px-2">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              /* Empty state for surveys */
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card className="border-l-4 border-l-primary">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileCode className="h-5 w-5 text-primary" />
+                    Form Designer
+                  </CardTitle>
+                  <CardDescription>
+                    Design your CRFs, skip logic, and validation rules.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Current Version:</span>
+                      <Badge variant="outline">v{project.version || '1.0'}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Last Updated:</span>
+                      <span>{new Date(project.updated_at).toLocaleDateString()}</span>
+                    </div>
+                    <Button 
+                      className="w-full mt-4" 
+                      onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}
+                    >
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Open Designer
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No surveys yet</h3>
-                  <p className="text-muted-foreground text-center mb-6">
-                    Create your first survey to start collecting data for this project
-                  </p>
-                  <Button onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Survey
+                <CardHeader>
+                  <CardTitle className="text-lg">Quick Actions</CardTitle>
+                  <CardDescription>Common tasks for study management</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button variant="outline" className="w-full justify-start">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Download Protocol (ZIP)
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Users className="h-4 w-4 mr-2" />
+                    Assign Team Access
                   </Button>
                 </CardContent>
               </Card>
-            )}
+            </div>
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-4">

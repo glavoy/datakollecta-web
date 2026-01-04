@@ -2,12 +2,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   FolderKanban,
-  FileSpreadsheet,
   Users,
   Database as DatabaseIcon,
   Settings,
-  LogOut,
-  Database
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,7 +13,6 @@ import { useAuth } from "@/contexts/AuthContext";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
-  { name: "Surveys", href: "/dashboard/surveys", icon: FileSpreadsheet },
   { name: "Field Teams", href: "/dashboard/teams", icon: Users },
   { name: "Submissions", href: "/dashboard/data", icon: DatabaseIcon },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
@@ -34,8 +31,8 @@ const DashboardSidebar = () => {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col">
       <div className="p-6 border-b border-border">
-        <Link to="/" className="flex items-center gap-2">
-          <Database className="h-8 w-8 text-secondary" />
+        <Link to="/" className="flex items-center gap-4">
+          <img src="/logo.png" alt="DataKollecta" className="h-20 w-auto" />
           <span className="text-xl font-semibold text-card-foreground">DataKollecta</span>
         </Link>
       </div>

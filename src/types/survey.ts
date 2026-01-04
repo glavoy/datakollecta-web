@@ -139,9 +139,17 @@ export interface SurveyForm {
   questions: SurveyQuestion[];
 }
 
-export interface SurveyPackage {
-  id: string;
-  name: string;
+/**
+ * Represents the survey configuration for a Project.
+ * In the new flattened structure, the 'SurveyPackage' is essentially the Project's protocol.
+ */
+export interface ProjectProtocol {
+  id: string; // This is the Project ID
+  name: string; // Project Name
   version: string;
   forms: SurveyForm[];
 }
+
+// Alias for backward compatibility if needed during refactor, 
+// but code should prefer ProjectProtocol
+export type SurveyPackage = ProjectProtocol;

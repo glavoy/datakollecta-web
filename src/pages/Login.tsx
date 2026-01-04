@@ -119,11 +119,10 @@ const Login = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <Database className="h-10 w-10 text-secondary" />
-            <span className="text-2xl font-bold text-foreground">DataKollecta</span>
+          <Link to="/" className="inline-block mb-6">
+            <img src="/logo.png" alt="DataKollecta" className="h-56 w-auto mx-auto" />
           </Link>
-          <p className="text-muted-foreground">Sign in to manage your data collection projects</p>
+          <p className="text-muted-foreground text-lg">Sign in to manage your data collection projects</p>
         </div>
 
         {error && (

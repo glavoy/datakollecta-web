@@ -4,6 +4,10 @@ import { generateManifestGistx, generateFormXml } from "@/lib/xmlGenerator";
 import JSZip from "jszip";
 
 export const surveyService = {
+  /**
+   * Saves the survey protocol (forms/CRFs) directly to the Project.
+   * This updates the 'projects' table with the zip/manifest and the 'crfs' table with the form definitions.
+   */
   async saveSurveyPackage(pkg: SurveyPackage, projectId: string, userId: string) {
     // 1. Generate the Zip content
     const zip = new JSZip();
@@ -17,83 +21,91 @@ export const surveyService = {
     
     const zipBlob = await zip.generateAsync({ type: "blob" });
     
-    // 2. Upload Zip to Storage
+    // 2. Upload Zip to Storage (Bucket: 'surveys')
+    // Naming convention: project_slug_version_date.zip or similar
     const date = new Date().toISOString().split('T')[0];
     const sanitizedName = pkg.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const filePath = `${projectId}/${sanitizedName}_${date}_${Date.now()}.zip`;
+    const filePath = `${projectId}/${sanitizedName}_v${pkg.version}_${date}_${Date.now()}.zip`;
     
     const { error: uploadError } = await supabase.storage
-      .from('survey-packages')
+      .from('surveys')
       .upload(filePath, zipBlob);
 
     if (uploadError) throw uploadError;
 
-    // 3. Update/Insert survey_packages table
-    const { data: packageData, error: packageError } = await supabase
-      .from('survey_packages')
-      .upsert({
-        id: pkg.id,
-        project_id: projectId,
-        name: pkg.name,
+    // 3. Update 'projects' table with the new protocol info
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .update({
         version: pkg.version,
         manifest: JSON.parse(manifestJson),
         zip_file_path: filePath,
-        created_by: userId,
         updated_at: new Date().toISOString(),
+        status: 'draft' // Or whatever status is appropriate
       })
+      .eq('id', projectId)
       .select()
       .single();
 
-    if (packageError) throw packageError;
+    if (projectError) throw projectError;
 
     // 4. Update/Insert individual CRFs
+    // Note: In a flattened structure, CRFs are direct children of the Project.
     for (const form of pkg.forms) {
       const { error: crfError } = await supabase
         .from('crfs')
         .upsert({
+          // We use a composite key of (project_id, table_name) for upsert if possible,
+          // but the table PK is UUID. The UI generates random UUIDs for new forms.
+          // If we want to update existing CRFs, we need to match IDs or delete-insert.
+          // For now, using the ID from the designer (which is consistent for updates).
           id: form.id,
-          survey_package_id: packageData.id,
           project_id: projectId,
           table_name: form.tablename,
           display_name: form.displayname,
           display_order: form.displayOrder,
           parent_table: form.parenttable,
           linking_field: form.linkingfield,
-          id_config: form.idconfig,
+          id_config: form.id_config,
           display_fields: form.displayFields,
-          fields: form.questions, // This stores the question structure for editing
+          fields: form.questions, // JSONB column
+          auto_start_repeat: form.autoStartRepeat,
+          repeat_enforce_count: form.repeatEnforceCount,
         });
 
       if (crfError) throw crfError;
     }
 
-    return packageData;
+    return projectData;
   },
 
-  async getSurveyPackage(surveyId: string): Promise<SurveyPackage> {
-    // 1. Fetch the package
-    const { data: pkg, error: pkgError } = await supabase
-      .from('survey_packages')
+  /**
+   * Loads the survey protocol for a specific Project.
+   */
+  async getSurveyPackage(projectId: string): Promise<SurveyPackage> {
+    // 1. Fetch the project
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
       .select('*')
-      .eq('id', surveyId)
+      .eq('id', projectId)
       .single();
 
-    if (pkgError) throw pkgError;
+    if (projectError) throw projectError;
 
-    // 2. Fetch the CRFs
+    // 2. Fetch the CRFs associated with this project
     const { data: crfs, error: crfsError } = await supabase
       .from('crfs')
       .select('*')
-      .eq('survey_package_id', surveyId)
+      .eq('project_id', projectId)
       .order('display_order');
 
     if (crfsError) throw crfsError;
 
-    // 3. Map back to SurveyPackage type
+    // 3. Construct the Protocol object (SurveyPackage)
     return {
-      id: pkg.id,
-      name: pkg.name,
-      version: pkg.version || '1.0',
+      id: project.id,
+      name: project.name,
+      version: project.version || '1.0',
       forms: crfs.map(crf => ({
         id: crf.id,
         tablename: crf.table_name,
@@ -103,7 +115,7 @@ export const surveyService = {
         linkingfield: crf.linking_field,
         displayFields: crf.display_fields,
         idconfig: crf.id_config,
-        questions: crf.fields || [], // The questions are stored in the fields JSONB column
+        questions: crf.fields || [],
         autoStartRepeat: crf.auto_start_repeat || 0,
         repeatEnforceCount: crf.repeat_enforce_count || 1,
       }))

@@ -5,10 +5,9 @@ import { Database } from "lucide-react";
 const Header = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <Database className="h-8 w-8 text-secondary" />
-          <span className="text-xl font-semibold text-foreground">DataKollecta</span>
+      <div className="container mx-auto px-6 h-32 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-4">
+          <img src="/logo.png" alt="DataKollecta" className="h-28 w-auto" />
         </Link>
         
         <nav className="hidden md:flex items-center gap-8">
