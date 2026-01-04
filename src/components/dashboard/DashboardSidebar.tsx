@@ -1,15 +1,16 @@
-import { Link, useLocation } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  FolderKanban, 
-  FileSpreadsheet, 
-  Users, 
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  FileSpreadsheet,
+  Users,
   Database as DatabaseIcon,
   Settings,
   LogOut,
   Database
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -22,7 +23,14 @@ const navigation = [
 
 const DashboardSidebar = () => {
   const location = useLocation();
-  
+  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col">
       <div className="p-6 border-b border-border">
@@ -54,13 +62,18 @@ const DashboardSidebar = () => {
       </nav>
       
       <div className="p-4 border-t border-border">
-        <Link 
-          to="/"
-          className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        {user && (
+          <div className="px-4 py-2 mb-2 text-xs text-muted-foreground truncate">
+            {user.email}
+          </div>
+        )}
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors w-full"
         >
           <LogOut className="h-5 w-5" />
           Sign Out
-        </Link>
+        </button>
       </div>
     </aside>
   );

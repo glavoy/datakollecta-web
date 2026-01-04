@@ -1,15 +1,18 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { 
-  Plus, 
-  Search, 
+import {
+  Plus,
+  Search,
   MoreVertical,
   Users,
   FileSpreadsheet,
-  Database
+  Database,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -17,55 +20,64 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
-const projects = [
-  { 
-    id: 1, 
-    name: "Clinical Trial Alpha", 
-    slug: "clinical-alpha",
-    description: "Phase 2 clinical trial for cardiovascular drug",
-    status: "active",
-    surveys: 5, 
-    submissions: 1247, 
-    team: 12,
-    role: "Owner"
-  },
-  { 
-    id: 2, 
-    name: "Field Study Beta", 
-    slug: "field-beta",
-    description: "Agricultural survey in rural communities",
-    status: "active",
-    surveys: 3, 
-    submissions: 856, 
-    team: 8,
-    role: "Admin"
-  },
-  { 
-    id: 3, 
-    name: "Community Health Survey", 
-    slug: "community-health",
-    description: "Public health assessment across 5 districts",
-    status: "active",
-    surveys: 7, 
-    submissions: 2341, 
-    team: 24,
-    role: "Editor"
-  },
-  { 
-    id: 4, 
-    name: "Education Assessment 2024", 
-    slug: "education-2024",
-    description: "Student performance evaluation study",
-    status: "draft",
-    surveys: 2, 
-    submissions: 0, 
-    team: 5,
-    role: "Owner"
-  },
-];
+interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
 
 const Projects = () => {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchProjects();
+  }, [user]);
+
+  const fetchProjects = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setProjects(data || []);
+    } catch (error: any) {
+      console.error('Error fetching projects:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load projects. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProjects = projects.filter(project =>
+    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    project.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    project.slug.toLowerCase().includes(searchQuery.toLowerCase())
+  );
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -84,67 +96,117 @@ const Projects = () => {
         {/* Search */}
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search projects..." 
+          <Input
+            placeholder="Search projects..."
             className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && filteredProjects.length === 0 && (
+          <Card className="bg-card border-border">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Database className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">
+                {searchQuery ? "No projects found" : "No projects yet"}
+              </h3>
+              <p className="text-muted-foreground text-center mb-6">
+                {searchQuery
+                  ? "Try adjusting your search terms"
+                  : "Create your first project to start collecting data"}
+              </p>
+              {!searchQuery && (
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Project
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Projects Grid */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {projects.map((project) => (
-            <Card key={project.id} className="bg-card border-border hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-start justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-xl">{project.name}</CardTitle>
-                    <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
-                      {project.status}
-                    </Badge>
+        {!loading && filteredProjects.length > 0 && (
+          <div className="grid gap-6 md:grid-cols-2">
+            {filteredProjects.map((project) => (
+              <Card
+                key={project.id}
+                className="bg-card border-border hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/dashboard/projects/${project.slug}`)}
+              >
+                <CardHeader className="flex flex-row items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-xl">{project.name}</CardTitle>
+                      <Badge variant={project.is_active ? 'default' : 'secondary'}>
+                        {project.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+                    <CardDescription>{project.description}</CardDescription>
+                    <div className="flex items-center gap-2 pt-1">
+                      <Badge variant="outline" className="text-xs">
+                        Owner
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Code: {project.slug}
+                      </span>
+                    </div>
                   </div>
-                  <CardDescription>{project.description}</CardDescription>
-                  <div className="flex items-center gap-2 pt-1">
-                    <Badge variant="outline" className="text-xs">
-                      {project.role}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Code: {project.slug}
-                    </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/projects/${project.slug}`); }}>
+                        View Project
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                        Edit Settings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                        Manage Team
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                        Archive
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">0 surveys</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Database className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">0</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">1 member</span>
+                    </div>
                   </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>View Details</DropdownMenuItem>
-                    <DropdownMenuItem>Edit Settings</DropdownMenuItem>
-                    <DropdownMenuItem>Manage Team</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">Archive</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">{project.surveys} surveys</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Database className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">{project.submissions.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">{project.team} members</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
