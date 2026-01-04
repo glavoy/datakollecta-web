@@ -1,73 +1,37 @@
-# Welcome to your Lovable project
+# Datakollecta Web
 
-## Project info
+Datakollecta is a comprehensive platform designed for research projects, field surveys, and clinical trials. It enables organizations to design complex surveys, manage field teams, and ensure data integrity across both offline and online environments.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Key Features
 
-## How can I edit this code?
+### 🚀 Survey Design Engine
+*   **Visual Builder:** intuitive interface for creating and managing survey forms.
+*   **Complex Logic:** Support for skip logic, validation rules, and specialized question types (text, date, single/multi-select, etc.).
+*   **Form Management:** Version control, form duplication, and lifecycle management.
 
-There are several ways of editing your application.
+### 📊 Data Management & Dashboard
+*   **Real-time Stats:** Interactive dashboards visualizing data collection progress.
+*   **Flexible Storage:** JSONB-based storage to accommodate varying survey structures without schema migrations.
+*   **Export & Analysis:** Export submissions to CSV, Excel, or JSON formats for external analysis.
+*   **Row-Level Security:** Strict data isolation ensures users only access data they are authorized to see.
 
-**Use Lovable**
+### 👥 Team & Field Management
+*   **Worker Credentials:** Manage dedicated credentials for field workers.
+*   **Session Tracking:** Monitor active sessions and data collection activity.
+*   **Offline-First:** Built-in support for offline data collection with robust synchronization and conflict resolution when connectivity is restored.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
 
-Changes made via Lovable will be committed automatically to this repo.
 
-**Use your preferred IDE**
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Project Structure
 
-Follow these steps:
+*   `src/components`: Reusable UI components and feature-specific widgets.
+    *   `src/components/survey-designer`: Core logic for the survey builder.
+    *   `src/components/dashboard`: Dashboard widgets and layout.
+    *   `src/components/ui`: Shadcn UI primitives.
+*   `src/pages`: Top-level route components (Dashboard, Login, SurveyDesigner, etc.).
+*   `src/lib`: Utility functions, Supabase client setup, and XML generation logic.
+*   `src/types`: TypeScript definitions for surveys, forms, and data structures.
+*   `src/hooks`: Custom React hooks (e.g., authentication, mobile detection).
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
