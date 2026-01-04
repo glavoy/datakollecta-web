@@ -12,7 +12,9 @@ import {
   Users,
   Database,
   Settings,
-  Loader2
+  Loader2,
+  Edit2,
+  ExternalLink
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -29,35 +31,44 @@ interface Project {
   created_by: string;
 }
 
+interface SurveyPackage {
+  id: string;
+  name: string;
+  version: string;
+  status: string;
+  created_at: string;
+}
+
 const ProjectDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [project, setProject] = useState<Project | null>(null);
+  const [surveys, setSurveys] = useState<SurveyPackage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (slug) {
-      fetchProject();
+      fetchProjectData();
     }
   }, [slug, user]);
 
-  const fetchProject = async () => {
+  const fetchProjectData = async () => {
     if (!user || !slug) return;
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // 1. Fetch project
+      const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select('*')
         .eq('slug', slug)
-        .eq('created_by', user.id)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No rows returned
+      if (projectError) {
+        if (projectError.code === 'PGRST116') {
           toast({
             title: "Project not found",
             description: "This project doesn't exist or you don't have access to it.",
@@ -66,15 +77,26 @@ const ProjectDetail = () => {
           navigate('/dashboard/projects');
           return;
         }
-        throw error;
+        throw projectError;
       }
 
-      setProject(data);
+      setProject(projectData);
+
+      // 2. Fetch surveys for this project
+      const { data: surveysData, error: surveysError } = await supabase
+        .from('survey_packages')
+        .select('id, name, version, status, created_at')
+        .eq('project_id', projectData.id)
+        .order('created_at', { ascending: false });
+
+      if (surveysError) throw surveysError;
+      setSurveys(surveysData || []);
+
     } catch (error: any) {
-      console.error('Error fetching project:', error);
+      console.error('Error fetching project data:', error);
       toast({
         title: "Error",
-        description: "Failed to load project. Please try again.",
+        description: "Failed to load project details.",
         variant: "destructive",
       });
       navigate('/dashboard/projects');
@@ -137,7 +159,7 @@ const ProjectDetail = () => {
               <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{surveys.length}</div>
               <p className="text-xs text-muted-foreground">Active data collection forms</p>
             </CardContent>
           </Card>
@@ -185,20 +207,59 @@ const ProjectDetail = () => {
               </Button>
             </div>
 
-            {/* Empty state for surveys */}
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No surveys yet</h3>
-                <p className="text-muted-foreground text-center mb-6">
-                  Create your first survey to start collecting data for this project
-                </p>
-                <Button onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Survey
-                </Button>
-              </CardContent>
-            </Card>
+            {surveys.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {surveys.map((survey) => (
+                  <Card key={survey.id} className="hover:border-primary/50 transition-colors">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-lg">{survey.name}</CardTitle>
+                        <Badge variant="outline">v{survey.version}</Badge>
+                      </div>
+                      <CardDescription>
+                        Created {new Date(survey.created_at).toLocaleDateString()}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Badge variant={survey.status === 'ready' ? 'default' : 'secondary'}>
+                          {survey.status}
+                        </Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/${survey.id}`)}
+                        >
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" className="px-2">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              /* Empty state for surveys */
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No surveys yet</h3>
+                  <p className="text-muted-foreground text-center mb-6">
+                    Create your first survey to start collecting data for this project
+                  </p>
+                  <Button onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Survey
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-4">

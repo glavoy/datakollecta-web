@@ -54,6 +54,11 @@ const App = () => (
                 <SurveyDesignerPage />
               </ProtectedRoute>
             } />
+            <Route path="/dashboard/projects/:slug/surveys/:surveyId" element={
+              <ProtectedRoute>
+                <SurveyDesignerPage />
+              </ProtectedRoute>
+            } />
             <Route path="/dashboard/surveys" element={
               <ProtectedRoute>
                 <Surveys />

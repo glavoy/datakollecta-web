@@ -1,4 +1,5 @@
 import { SurveyForm, SurveyQuestion, SurveyPackage } from "@/types/survey";
+import JSZip from "jszip";
 
 function escapeXml(text: string): string {
   return text
@@ -204,6 +205,38 @@ export function generateManifestGistx(pkg: SurveyPackage): string {
 export function downloadFile(content: string, filename: string, type: string = 'text/xml') {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadSurveyZip(pkg: SurveyPackage) {
+  const zip = new JSZip();
+  
+  // Add manifest
+  const manifestJson = generateManifestGistx(pkg);
+  zip.file('survey_manifest.gistx', manifestJson);
+  
+  // Add each form as XML
+  pkg.forms.forEach(form => {
+    const xml = generateFormXml(form);
+    zip.file(`${form.tablename}.xml`, xml);
+  });
+  
+  // Generate zip file
+  const content = await zip.generateAsync({ type: "blob" });
+  
+  // Create filename: project_name_yyyy-mm-dd.zip
+  const date = new Date().toISOString().split('T')[0];
+  const sanitizedProjectName = pkg.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const filename = `${sanitizedProjectName}_${date}.zip`;
+  
+  // Download logic (reusing basic anchor tag approach)
+  const url = URL.createObjectURL(content);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;

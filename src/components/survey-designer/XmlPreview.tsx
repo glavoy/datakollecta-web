@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { generateFormXml, generateManifestGistx, downloadFile } from "@/lib/xmlGenerator";
-import { Copy, Download } from "lucide-react";
+import { generateFormXml, generateManifestGistx, downloadFile, downloadSurveyZip } from "@/lib/xmlGenerator";
+import { Copy, Download, FileArchive } from "lucide-react";
 import { toast } from "sonner";
 
 interface XmlPreviewProps {
@@ -42,13 +42,14 @@ const XmlPreview = ({ surveyPackage, currentForm, open, onOpenChange }: XmlPrevi
     toast.success('Manifest file downloaded');
   };
 
-  const handleDownloadAll = () => {
-    surveyPackage.forms.forEach(form => {
-      const xml = generateFormXml(form);
-      downloadFile(xml, `${form.tablename}.xml`, 'text/xml');
-    });
-    downloadFile(manifestJson, 'survey_manifest.gistx', 'application/json');
-    toast.success('All files downloaded');
+  const handleDownloadZip = async () => {
+    try {
+      await downloadSurveyZip(surveyPackage);
+      toast.success('Survey package downloaded');
+    } catch (error) {
+      console.error('Failed to generate zip:', error);
+      toast.error('Failed to generate zip file');
+    }
   };
 
   return (
@@ -124,9 +125,9 @@ const XmlPreview = ({ surveyPackage, currentForm, open, onOpenChange }: XmlPrevi
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button onClick={handleDownloadAll}>
-            <Download className="h-4 w-4 mr-2" />
-            Download All Files
+          <Button onClick={handleDownloadZip}>
+            <FileArchive className="h-4 w-4 mr-2" />
+            Download Zip Package
           </Button>
         </DialogFooter>
       </DialogContent>

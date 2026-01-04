@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SurveyPackage, SurveyForm, SurveyQuestion, QuestionType } from "@/types/survey";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,13 +31,17 @@ import {
   FileSpreadsheet,
   Copy,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  CloudUpload,
+  Loader2
 } from "lucide-react";
 import QuestionTypeSelector from "./QuestionTypeSelector";
 import QuestionCard from "./QuestionCard";
 import QuestionEditor from "./QuestionEditor";
 import FormManifestEditor from "./FormManifestEditor";
 import XmlPreview from "./XmlPreview";
+import { surveyService } from "@/services/surveyService";
+import { useToast } from "@/hooks/use-toast";
 
 const createDefaultQuestion = (type: QuestionType): SurveyQuestion => ({
   id: crypto.randomUUID(),
@@ -61,9 +65,12 @@ const createDefaultForm = (): SurveyForm => ({
 interface SurveyDesignerProps {
   initialPackage?: SurveyPackage;
   onSave?: (pkg: SurveyPackage) => void;
+  projectId?: string | null;
+  userId?: string;
 }
 
-const SurveyDesigner = ({ initialPackage, onSave }: SurveyDesignerProps) => {
+const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDesignerProps) => {
+  const { toast } = useToast();
   const [surveyPackage, setSurveyPackage] = useState<SurveyPackage>(
     initialPackage || {
       id: crypto.randomUUID(),
@@ -80,6 +87,17 @@ const SurveyDesigner = ({ initialPackage, onSave }: SurveyDesignerProps) => {
   const [showFormSettings, setShowFormSettings] = useState(false);
   const [showXmlPreview, setShowXmlPreview] = useState(false);
   const [deleteFormId, setDeleteFormId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync state when initialPackage changes (e.g. after async load)
+  useEffect(() => {
+    if (initialPackage) {
+      setSurveyPackage(initialPackage);
+      if (initialPackage.forms.length > 0) {
+        setActiveFormId(initialPackage.forms[0].id);
+      }
+    }
+  }, [initialPackage]);
 
   const activeForm = surveyPackage.forms.find(f => f.id === activeFormId);
 
@@ -87,6 +105,35 @@ const SurveyDesigner = ({ initialPackage, onSave }: SurveyDesignerProps) => {
     const updated = { ...surveyPackage, ...updates };
     setSurveyPackage(updated);
     onSave?.(updated);
+  };
+
+  const handleSaveToProject = async () => {
+    if (!projectId || !userId) {
+      toast({
+        title: "Cannot save",
+        description: "Missing project or user context.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await surveyService.saveSurveyPackage(surveyPackage, projectId, userId);
+      toast({
+        title: "Success",
+        description: "Survey package saved to project successfully.",
+      });
+    } catch (error: any) {
+      console.error('Error saving survey:', error);
+      toast({
+        title: "Error saving survey",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const updateForm = (formId: string, updates: Partial<SurveyForm>) => {
@@ -192,12 +239,25 @@ const SurveyDesigner = ({ initialPackage, onSave }: SurveyDesignerProps) => {
           <Badge variant="outline">v{surveyPackage.version}</Badge>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleSaveToProject} 
+            disabled={!projectId || isSaving}
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <CloudUpload className="h-4 w-4 mr-2" />
+            )}
+            Save to Project
+          </Button>
           <Button variant="outline" onClick={() => setShowXmlPreview(true)}>
             <FileCode className="h-4 w-4 mr-2" />
             Preview & Export
           </Button>
         </div>
       </div>
+
 
       {/* Forms Tabs */}
       <Tabs value={activeFormId} onValueChange={setActiveFormId} className="flex-1 flex flex-col">
