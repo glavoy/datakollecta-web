@@ -119,7 +119,20 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
 
     try {
       setIsSaving(true);
-      await surveyService.saveSurveyPackage(surveyPackage, projectId, userId);
+
+      // Generate survey name and display name
+      const date = new Date().toISOString().split('T')[0].replace(/-/g, '_');
+      const surveyDisplayName = surveyPackage.name || 'New Survey';
+      const surveyName = surveyDisplayName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_' + date;
+
+      await surveyService.saveSurveyPackage(
+        surveyPackage,
+        projectId,
+        userId,
+        surveyDisplayName,
+        surveyName
+      );
+
       toast({
         title: "Success",
         description: "Survey package saved to project successfully.",

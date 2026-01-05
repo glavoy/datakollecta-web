@@ -1,6 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
   FolderKanban,
   Users,
   Database as DatabaseIcon,
@@ -11,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
   { name: "Field Teams", href: "/dashboard/teams", icon: Users },
   { name: "Submissions", href: "/dashboard/data", icon: DatabaseIcon },

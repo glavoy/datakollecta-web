@@ -90,8 +90,10 @@ function generateQuestionXml(question: SurveyQuestion, indent: string = '    '):
   
   // Logic Check
   if (question.logicCheck) {
-    lines.push(`${indent}    <logic_check message='${escapeXml(question.logicCheck.message)}'>`);
-    lines.push(`${indent}        ${escapeXml(question.logicCheck.condition)}`);
+    // Format: condition; 'message'
+    const content = `${escapeXml(question.logicCheck.condition)}; '${escapeXml(question.logicCheck.message)}'`;
+    lines.push(`${indent}    <logic_check>`);
+    lines.push(`${indent}        ${content}`);
     lines.push(`${indent}    </logic_check>`);
   }
   
@@ -185,19 +187,24 @@ export function generateFormXml(form: SurveyForm): string {
 }
 
 export function generateManifestGistx(pkg: SurveyPackage): string {
-  const manifest = pkg.forms.map(form => ({
-    tablename: form.tablename,
-    displayname: form.displayname,
-    display_order: form.displayOrder,
-    parenttable: form.parenttable || null,
-    linkingfield: form.linkingfield || null,
-    display_fields: form.displayFields || null,
-    idconfig: form.idconfig ? JSON.stringify(form.idconfig) : null,
-    repeat_count_field: form.repeatCountField || null,
-    repeat_count_source: form.repeatCountSource || null,
-    auto_start_repeat: form.autoStartRepeat,
-    repeat_enforce_count: form.repeatEnforceCount,
-  }));
+  const sanitizedId = pkg.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  
+  const manifest = {
+    surveyName: pkg.name,
+    surveyId: sanitizedId,
+    databaseName: `${sanitizedId}.sqlite`,
+    xmlFiles: pkg.forms.map(f => `${f.tablename}.xml`),
+    crfs: pkg.forms.map(form => ({
+      display_order: form.displayOrder,
+      tablename: form.tablename,
+      displayname: form.displayname,
+      isbase: 1, 
+      primarykey: form.questions.find(q => q.id === "subjid") ? "subjid" : "id",
+      linkingfield: form.linkingfield || "subjid",
+      idconfig: form.idconfig || null,
+      display_fields: form.displayFields || null
+    }))
+  };
   
   return JSON.stringify(manifest, null, 2);
 }

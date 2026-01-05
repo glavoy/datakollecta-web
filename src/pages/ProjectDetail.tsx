@@ -5,6 +5,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   ArrowLeft,
   Plus,
@@ -15,11 +30,17 @@ import {
   Loader2,
   Edit2,
   FileCode,
-  ListChecks
+  ListChecks,
+  Upload,
+  FileUp,
+  Download,
+  Trash2
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import JSZip from "jszip";
+import { parseSurveyXml } from "@/lib/xmlParser";
 
 interface Project {
   id: string;
@@ -34,14 +55,33 @@ interface Project {
   status?: string;
 }
 
+interface SurveyPackage {
+  id: string;
+  name: string;
+  display_name: string;
+  version_date: string;
+  status: string;
+  description: string;
+  zip_file_path: string;
+  created_at: string;
+}
+
 const ProjectDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  
   const [project, setProject] = useState<Project | null>(null);
+  const [surveys, setSurveys] = useState<SurveyPackage[]>([]);
   const [crfCount, setCrfCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  
+  // Upload State
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadVersionName, setUploadVersionName] = useState("");
 
   useEffect(() => {
     if (slug) {
@@ -62,22 +102,21 @@ const ProjectDetail = () => {
         .eq('slug', slug)
         .single();
 
-      if (projectError) {
-        if (projectError.code === 'PGRST116') {
-          toast({
-            title: "Project not found",
-            description: "This project doesn't exist or you don't have access to it.",
-            variant: "destructive",
-          });
-          navigate('/dashboard/projects');
-          return;
-        }
-        throw projectError;
-      }
-
+      if (projectError) throw projectError;
       setProject(projectData);
 
-      // 2. Count CRFs (Forms)
+      // 2. Fetch Surveys (Survey Packages)
+      const { data: surveysData, error: surveysError } = await supabase
+        .from('survey_packages')
+        .select('*')
+        .eq('project_id', projectData.id)
+        .order('version_date', { ascending: false });
+
+      if (surveysError) throw surveysError;
+      setSurveys(surveysData || []);
+
+      // 3. Count CRFs (Forms) across all surveys or active ones
+      // For now, getting total CRFs linked to this project
       const { count, error: countError } = await supabase
         .from('crfs')
         .select('*', { count: 'exact', head: true })
@@ -96,6 +135,158 @@ const ProjectDetail = () => {
       navigate('/dashboard/projects');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteSurvey = async (surveyId: string) => {
+    try {
+      const { error } = await supabase
+        .from('survey_packages')
+        .delete()
+        .eq('id', surveyId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Survey deleted",
+        description: "The survey package has been removed.",
+      });
+      fetchProjectData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to delete survey.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFileUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile || !project) return;
+
+    try {
+      setUploading(true);
+
+      // 1. Validate ZIP
+      const zip = new JSZip();
+      const loadedZip = await zip.loadAsync(uploadFile);
+      
+      let manifestFile = null;
+      let manifestPath = "";
+
+      // Iterate to find survey_manifest.gistx case-insensitively
+      loadedZip.forEach((relativePath, file) => {
+        if (relativePath.toLowerCase().endsWith("survey_manifest.gistx")) {
+          manifestFile = file;
+          manifestPath = relativePath;
+        }
+      });
+
+      if (!manifestFile) {
+        throw new Error("Invalid ZIP: survey_manifest.gistx is missing.");
+      }
+
+      // @ts-ignore
+      const manifestContent = await manifestFile.async("string");
+      const manifest = JSON.parse(manifestContent);
+      
+      // VALIDATE MANIFEST CRFS
+      if (!manifest.crfs || !Array.isArray(manifest.crfs) || manifest.crfs.length === 0) {
+        throw new Error("Invalid Manifest: 'crfs' array is missing or empty.");
+      }
+
+      // 2. Upload to Storage
+      const filePath = `surveys/${project.id}/${Date.now()}_${uploadFile.name}`;
+      const { error: storageError } = await supabase.storage
+        .from('surveys')
+        .upload(filePath, uploadFile);
+
+      if (storageError) throw storageError;
+
+      // 3. Insert into survey_packages
+      const { data: surveyData, error: dbError } = await supabase
+        .from('survey_packages')
+        .insert({
+          project_id: project.id,
+          name: uploadVersionName,
+          display_name: manifest.surveyName || uploadVersionName,
+          version_date: new Date().toISOString(),
+          description: manifest.description || "",
+          zip_file_path: filePath,
+          manifest: manifest,
+          status: 'active',
+          created_by: user?.id
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      // 4. Process CRFs and their XML files
+      const crfsToInsert = [];
+      
+      for (const crfEntry of manifest.crfs) {
+        const xmlFileName = `${crfEntry.tablename}.xml`;
+        let xmlFile = null;
+        
+        // Find XML file in ZIP (might be in a subdirectory)
+        loadedZip.forEach((path, file) => {
+          if (path.toLowerCase().endsWith(xmlFileName.toLowerCase())) {
+            xmlFile = file;
+          }
+        });
+
+        if (!xmlFile) {
+          console.warn(`XML file ${xmlFileName} not found in ZIP.`);
+          continue;
+        }
+
+        const xmlContent = await xmlFile.async("string");
+        const questions = parseSurveyXml(xmlContent);
+
+        crfsToInsert.push({
+          survey_package_id: surveyData.id,
+          project_id: project.id,
+          table_name: crfEntry.tablename,
+          display_name: crfEntry.displayname,
+          display_order: crfEntry.display_order || 0,
+          is_base: crfEntry.isbase === 1,
+          primary_key: crfEntry.primarykey,
+          linking_field: crfEntry.linkingfield,
+          id_config: crfEntry.idconfig,
+          display_fields: crfEntry.display_fields,
+          fields: questions // JSONB column containing parsed questions
+        });
+      }
+
+      if (crfsToInsert.length > 0) {
+        const { error: crfError } = await supabase
+          .from('crfs')
+          .insert(crfsToInsert);
+
+        if (crfError) throw crfError;
+      }
+
+      toast({
+        title: "Success",
+        description: `Survey uploaded. ${crfsToInsert.length} questionnaire(s) processed.`,
+      });
+
+      setIsUploadOpen(false);
+      setUploadFile(null);
+      setUploadVersionName("");
+      fetchProjectData();
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to process survey package.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -149,12 +340,12 @@ const ProjectDetail = () => {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Forms (CRFs)</CardTitle>
+              <CardTitle className="text-sm font-medium">Surveys & Forms</CardTitle>
               <ListChecks className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{crfCount}</div>
-              <p className="text-xs text-muted-foreground">Active questionnaires</p>
+              <div className="text-2xl font-bold">{surveys.length}</div>
+              <p className="text-xs text-muted-foreground">Active survey versions</p>
             </CardContent>
           </Card>
 
@@ -192,60 +383,149 @@ const ProjectDetail = () => {
           <TabsContent value="design" className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold">Study Protocol & Forms</h2>
-                <p className="text-sm text-muted-foreground">Manage your CRFs and data dictionary</p>
+                <h2 className="text-xl font-semibold">Surveys</h2>
+                <p className="text-sm text-muted-foreground">Manage your study versions and questionnaires</p>
+              </div>
+              <div className="flex gap-2">
+                <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <FileUp className="mr-2 h-4 w-4" />
+                      Upload ZIP
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Upload Survey Package</DialogTitle>
+                      <DialogDescription>
+                        Upload a completed survey package (ZIP) containing manifest.json and XML forms.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleFileUpload}>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="versionName">Version Name</Label>
+                          <Input 
+                            id="versionName" 
+                            placeholder={`e.g., ${project.slug}_v1`} 
+                            value={uploadVersionName}
+                            onChange={(e) => setUploadVersionName(e.target.value)}
+                            required 
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="file">Survey ZIP File</Label>
+                          <Input 
+                            id="file" 
+                            type="file" 
+                            accept=".zip"
+                            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                            required 
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit" disabled={uploading}>
+                          {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Upload
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                
+                <Button onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create New Survey
+                </Button>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card className="border-l-4 border-l-primary">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileCode className="h-5 w-5 text-primary" />
-                    Form Designer
-                  </CardTitle>
-                  <CardDescription>
-                    Design your CRFs, skip logic, and validation rules.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Current Version:</span>
-                      <Badge variant="outline">v{project.version || '1.0'}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Last Updated:</span>
-                      <span>{new Date(project.updated_at).toLocaleDateString()}</span>
-                    </div>
-                    <Button 
-                      className="w-full mt-4" 
-                      onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}
-                    >
-                      <Edit2 className="h-4 w-4 mr-2" />
-                      Open Designer
-                    </Button>
+            {surveys.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-10 space-y-4">
+                  <div className="p-4 bg-muted rounded-full">
+                    <FileCode className="h-8 w-8 text-muted-foreground" />
                   </div>
+                  <div className="text-center">
+                    <h3 className="font-semibold text-lg">No surveys yet</h3>
+                    <p className="text-muted-foreground text-sm max-w-sm">
+                      Create a new survey using the designer or upload an existing package.
+                    </p>
+                  </div>
+                  <Button onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}>
+                    Create First Survey
+                  </Button>
                 </CardContent>
               </Card>
-
+            ) : (
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Quick Actions</CardTitle>
-                  <CardDescription>Common tasks for study management</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start">
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Download Protocol (ZIP)
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Users className="h-4 w-4 mr-2" />
-                    Assign Team Access
-                  </Button>
-                </CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Survey Name</TableHead>
+                      <TableHead>Version Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {surveys.map((survey) => (
+                      <TableRow key={survey.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span>{survey.display_name}</span>
+                            <span className="text-xs text-muted-foreground">{survey.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(survey.version_date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={survey.status === 'active' ? 'default' : 'secondary'}>
+                            {survey.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/${survey.id}`)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Survey?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete this survey version and all its questionnaires. Data collected for this version will also be deleted.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteSurvey(survey.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </Card>
-            </div>
+            )}
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-4">

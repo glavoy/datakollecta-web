@@ -10,7 +10,7 @@ import { surveyService } from "@/services/surveyService";
 import { SurveyPackage } from "@/types/survey";
 
 const SurveyDesignerPage = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, surveyId } = useParams<{ slug: string; surveyId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -48,22 +48,26 @@ const SurveyDesignerPage = () => {
         const pid = projectData.id;
         setProjectId(pid);
 
-        // 2. Fetch existing protocol/survey forms for this project
-        // If no forms exist yet, it will return an empty list in the package
-        try {
-          const pkg = await surveyService.getSurveyPackage(pid);
-          // If the project name differs from the one in state (rare), we can sync it here
-          // but mainly we want the forms.
-          setInitialPackage(pkg);
-        } catch (err) {
-          // If getting package fails (maybe CRFs table empty?), we might just start fresh.
-          // But surveyService.getSurveyPackage should handle empty CRFs gracefully.
-          console.log('No existing protocol found or error loading:', err);
-          
-          // Fallback: Start with basic project info
+        // 2. Load Survey Package
+        if (surveyId) {
+          // Edit existing survey
+          try {
+            const pkg = await surveyService.getSurveyPackage(surveyId);
+            setInitialPackage(pkg);
+          } catch (err) {
+            console.error('Error loading survey:', err);
+            toast({
+              title: "Error",
+              description: "Failed to load the requested survey.",
+              variant: "destructive",
+            });
+            navigate(`/dashboard/projects/${slug}`);
+          }
+        } else {
+          // Create New Survey - Start Fresh
           setInitialPackage({
-            id: pid,
-            name: projectData.name,
+            id: crypto.randomUUID(),
+            name: `${projectData.name} Survey`,
             version: '1.0',
             forms: []
           });
@@ -82,7 +86,7 @@ const SurveyDesignerPage = () => {
     };
 
     initialize();
-  }, [slug, user]);
+  }, [slug, surveyId, user]);
 
   if (loading) {
     return (

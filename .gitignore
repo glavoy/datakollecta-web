@@ -31,3 +31,6 @@ dist-ssr
 .claude
 .env.example
 .env*.local
+md
+sql
+enrollee.xml

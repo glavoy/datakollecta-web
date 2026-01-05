@@ -23,6 +23,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import CreateProjectDialog from "@/components/projects/CreateProjectDialog";
 
 interface Project {
   id: string;
@@ -39,6 +40,8 @@ const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -52,17 +55,40 @@ const Projects = () => {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+
+      // Fetch project IDs where user is a member
+      const { data: memberships, error: memberError } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', user.id);
+
+      if (memberError) {
+        console.error('Error fetching memberships:', memberError);
+        throw memberError;
+      }
+
+      // If no memberships, user has no projects - this is not an error
+      if (!memberships || memberships.length === 0) {
+        setProjects([]);
+        return;
+      }
+
+      // Fetch the actual projects
+      const projectIds = memberships.map(m => m.project_id);
+      const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('*')
-        .eq('created_by', user.id)
+        .in('id', projectIds)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (projectsError) {
+        console.error('Error fetching projects:', projectsError);
+        throw projectsError;
+      }
 
-      setProjects(data || []);
+      setProjects(projectsData || []);
     } catch (error: any) {
-      console.error('Error fetching projects:', error);
+      console.error('Error in fetchProjects:', error);
       toast({
         title: "Error",
         description: "Failed to load projects. Please try again.",
@@ -70,6 +96,69 @@ const Projects = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateProject = async (projectData: {
+    name: string;
+    slug: string;
+    description: string;
+  }) => {
+    if (!user) return;
+
+    try {
+      setCreating(true);
+
+      // Create the project (always active on creation)
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .insert({
+          name: projectData.name,
+          slug: projectData.slug,
+          description: projectData.description,
+          is_active: true,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+
+      // The trigger should automatically add the creator as owner in project_members
+      // But let's verify it worked by checking
+      const { data: membership, error: memberError } = await supabase
+        .from("project_members")
+        .select("*")
+        .eq("project_id", project.id)
+        .eq("user_id", user.id)
+        .single();
+
+      if (memberError || !membership) {
+        console.warn("Auto-owner trigger may not have fired, adding manually");
+        // Fallback: add owner manually if trigger didn't work
+        await supabase.from("project_members").insert({
+          project_id: project.id,
+          user_id: user.id,
+          role: "owner",
+        });
+      }
+
+      toast({
+        title: "Success",
+        description: "Project created successfully",
+      });
+
+      setCreateDialogOpen(false);
+      fetchProjects(); // Refresh the list
+    } catch (error: any) {
+      console.error("Error creating project:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create project",
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -87,7 +176,7 @@ const Projects = () => {
             <h1 className="text-3xl font-bold text-foreground">Projects</h1>
             <p className="text-muted-foreground">Manage your data collection projects</p>
           </div>
-          <Button>
+          <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Create Project
           </Button>
@@ -125,7 +214,7 @@ const Projects = () => {
                   : "Create your first project to start collecting data"}
               </p>
               {!searchQuery && (
-                <Button>
+                <Button onClick={() => setCreateDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Project
                 </Button>
@@ -208,6 +297,14 @@ const Projects = () => {
           </div>
         )}
       </div>
+
+      {/* Create Project Dialog */}
+      <CreateProjectDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSubmit={handleCreateProject}
+        loading={creating}
+      />
     </DashboardLayout>
   );
 };

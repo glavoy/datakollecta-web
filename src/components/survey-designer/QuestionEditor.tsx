@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SurveyQuestion, QuestionType, FieldType } from "@/types/survey";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,19 +35,17 @@ interface QuestionEditorProps {
 }
 
 const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: QuestionEditorProps) => {
-  const [editedQuestion, setEditedQuestion] = useState<SurveyQuestion | null>(null);
+  // Initialize synchronously from prop to avoid render flash/null issues
+  const [editedQuestion, setEditedQuestion] = useState<SurveyQuestion | null>(() => 
+    question ? JSON.parse(JSON.stringify(question)) : null
+  );
 
-  // Update local state when question changes
-  useState(() => {
+  // Sync with prop when it changes
+  useEffect(() => {
     if (question) {
-      setEditedQuestion({ ...question });
+      setEditedQuestion(JSON.parse(JSON.stringify(question)));
     }
-  });
-
-  // Reset when opening with a new question
-  if (question && (!editedQuestion || editedQuestion.id !== question.id)) {
-    setEditedQuestion({ ...question });
-  }
+  }, [question]);
 
   if (!editedQuestion) return null;
 
