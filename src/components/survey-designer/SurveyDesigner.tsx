@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -240,9 +239,9 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col w-full max-w-full overflow-hidden">
       {/* Package Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <div className="flex items-center gap-4">
           <Input
             value={surveyPackage.name}
@@ -273,8 +272,8 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
 
 
       {/* Forms Tabs */}
-      <Tabs value={activeFormId} onValueChange={setActiveFormId} className="flex-1 flex flex-col">
-        <div className="flex items-center gap-2 mb-4">
+      <Tabs value={activeFormId} onValueChange={setActiveFormId} className="flex-1 flex flex-col min-h-0">
+        <div className="flex items-center gap-2 mb-4 flex-shrink-0">
           <TabsList className="h-auto flex-wrap">
             {surveyPackage.forms.map((form) => (
               <TabsTrigger key={form.id} value={form.id} className="flex items-center gap-2">
@@ -289,7 +288,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
         </div>
 
         {surveyPackage.forms.map((form) => (
-          <TabsContent key={form.id} value={form.id} className="flex-1 flex flex-col mt-0">
+          <TabsContent key={form.id} value={form.id} className="flex-1 flex flex-col mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
             {/* Form Header */}
             <Card className="mb-4 bg-card border-border">
               <CardHeader className="py-3">
@@ -333,8 +332,8 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
             </Card>
 
             {/* Questions List */}
-            <ScrollArea className="flex-1">
-              <div className="space-y-3 pr-4">
+            <div className="flex-1 w-full overflow-y-auto min-h-0">
+              <div className="space-y-3 pr-4 w-full pb-4">
                 {form.questions.map((question, index) => (
                   <div key={question.id} className="flex items-start gap-2">
                     <div className="flex flex-col gap-1 pt-4">
@@ -415,7 +414,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
                   </Button>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </TabsContent>
         ))}
       </Tabs>

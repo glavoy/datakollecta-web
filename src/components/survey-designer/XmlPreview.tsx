@@ -9,7 +9,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { generateFormXml, generateManifestGistx, downloadFile, downloadSurveyZip } from "@/lib/xmlGenerator";
 import { Copy, Download, FileArchive } from "lucide-react";
 import { toast } from "sonner";
@@ -54,7 +53,7 @@ const XmlPreview = ({ surveyPackage, currentForm, open, onOpenChange }: XmlPrevi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Preview & Export</DialogTitle>
           <DialogDescription>
@@ -84,11 +83,11 @@ const XmlPreview = ({ surveyPackage, currentForm, open, onOpenChange }: XmlPrevi
                     </Button>
                   </div>
                 </div>
-                <ScrollArea className="flex-1 border border-border rounded-lg bg-muted/30">
+                <div className="border border-border rounded-lg bg-muted/30 overflow-auto" style={{ height: 'calc(90vh - 300px)' }}>
                   <pre className="p-4 text-sm font-mono whitespace-pre-wrap">
                     {formXml}
                   </pre>
-                </ScrollArea>
+                </div>
               </div>
             ) : (
               <p className="text-muted-foreground text-center py-8">
@@ -112,11 +111,11 @@ const XmlPreview = ({ surveyPackage, currentForm, open, onOpenChange }: XmlPrevi
                   </Button>
                 </div>
               </div>
-              <ScrollArea className="flex-1 border border-border rounded-lg bg-muted/30">
+              <div className="border border-border rounded-lg bg-muted/30 overflow-auto" style={{ height: 'calc(90vh - 300px)' }}>
                 <pre className="p-4 text-sm font-mono whitespace-pre-wrap">
                   {manifestJson}
                 </pre>
-              </ScrollArea>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

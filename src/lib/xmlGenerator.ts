@@ -1,8 +1,10 @@
 import { SurveyForm, SurveyQuestion, SurveyPackage } from "@/types/survey";
 import JSZip from "jszip";
 
-function escapeXml(text: string): string {
-  return text
+function escapeXml(text: string | number | undefined | null): string {
+  if (text === undefined || text === null) return '';
+  const str = String(text);
+  return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

@@ -52,32 +52,32 @@ const QuestionCard = ({ question, index, onEdit, onDuplicate, onDelete }: Questi
   const hasSkipLogic = (question.preskip && question.preskip.length > 0) || (question.postskip && question.postskip.length > 0);
   
   return (
-    <Card className="bg-card border-border hover:border-primary/50 transition-colors group">
+    <Card className="bg-card border-border hover:border-primary/50 transition-colors group min-w-0 w-full">
       <CardContent className="p-4">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 w-full">
           <div className="cursor-grab text-muted-foreground hover:text-foreground mt-1">
             <GripVertical className="h-5 w-5" />
           </div>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-medium text-muted-foreground">Q{index + 1}</span>
-              <Badge variant="secondary" className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="text-sm font-medium text-muted-foreground flex-shrink-0">Q{index + 1}</span>
+              <Badge variant="secondary" className="flex items-center gap-1 flex-shrink-0">
                 {typeIcons[question.type]}
                 {typeLabels[question.type]}
               </Badge>
-              <Badge variant="outline" className="font-mono text-xs">
+              <Badge variant="outline" className="font-mono text-xs truncate max-w-[200px]" title={question.fieldname}>
                 {question.fieldname}
               </Badge>
               {hasValidation && (
-                <Badge variant="default" className="text-xs">Validation</Badge>
+                <Badge variant="default" className="text-xs flex-shrink-0">Validation</Badge>
               )}
               {hasSkipLogic && (
-                <Badge variant="default" className="text-xs">Skip Logic</Badge>
+                <Badge variant="default" className="text-xs flex-shrink-0">Skip Logic</Badge>
               )}
             </div>
             
-            <p className="text-foreground truncate">
+            <p className="text-foreground break-words text-sm mb-2 line-clamp-3">
               {question.text || <span className="text-muted-foreground italic">No question text</span>}
             </p>
             
@@ -97,7 +97,7 @@ const QuestionCard = ({ question, index, onEdit, onDuplicate, onDelete }: Questi
             )}
           </div>
           
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <Button variant="ghost" size="icon" onClick={onEdit}>
               <Pencil className="h-4 w-4" />
             </Button>

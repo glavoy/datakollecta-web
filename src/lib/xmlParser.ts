@@ -29,10 +29,10 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
   return questions.map((q: any) => {
     const question: SurveyQuestion = {
       id: crypto.randomUUID(),
-      type: q.type as QuestionType,
-      fieldname: q.fieldname,
-      fieldtype: q.fieldtype as FieldType,
-      text: q.text || "",
+      type: String(q.type).trim() as QuestionType,
+      fieldname: String(q.fieldname).trim(),
+      fieldtype: String(q.fieldtype).trim() as FieldType,
+      text: typeof q.text === 'string' ? q.text.trim() : (q.text && q.text['#text'] ? String(q.text['#text']).trim() : ""),
     };
 
     if (q.maxCharacters) {
