@@ -152,9 +152,15 @@ const Projects = () => {
       fetchProjects(); // Refresh the list
     } catch (error: any) {
       console.error("Error creating project:", error);
+      
+      let errorMessage = error.message || "Failed to create project";
+      if (error.code === '23505' || errorMessage.includes('unique') || errorMessage.includes('slug')) {
+        errorMessage = "This project code is already taken. Please choose another.";
+      }
+
       toast({
         title: "Error",
-        description: error.message || "Failed to create project",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

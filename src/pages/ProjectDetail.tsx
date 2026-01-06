@@ -42,6 +42,8 @@ import { useToast } from "@/hooks/use-toast";
 import JSZip from "jszip";
 import { parseSurveyXml } from "@/lib/xmlParser";
 
+import { surveyService } from "@/services/surveyService";
+
 interface Project {
   id: string;
   name: string;
@@ -135,6 +137,46 @@ const ProjectDetail = () => {
       navigate('/dashboard/projects');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadSurvey = async (filePath: string, fileName: string) => {
+    if (!filePath) {
+      toast({
+        title: "Error",
+        description: "No file path available for this survey.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const signedUrl = await surveyService.getSurveyDownloadUrl(filePath);
+      
+      if (!signedUrl) {
+        throw new Error("Could not generate download URL.");
+      }
+
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = signedUrl;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      toast({
+        title: "Download Started",
+        description: "Your survey package is downloading.",
+      });
+
+    } catch (error: any) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download survey package.",
+        variant: "destructive",
+      });
     }
   };
 

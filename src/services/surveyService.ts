@@ -13,7 +13,8 @@ export const surveyService = {
     projectId: string,
     userId: string,
     surveyDisplayName: string,
-    surveyName: string
+    surveyName: string,
+    status: 'draft' | 'active' | 'ready' = 'draft'
   ) {
     // 1. Generate the Zip content
     const zip = new JSZip();
@@ -50,7 +51,7 @@ export const surveyService = {
         description: null, // Optional description field
         manifest: JSON.parse(manifestJson),
         zip_file_path: filePath,
-        status: 'draft',
+        status: status,
         created_by: userId,
         updated_at: new Date().toISOString(),
       })
@@ -163,9 +164,39 @@ export const surveyService = {
       .from('survey_packages')
       .select('*, crfs(count)')
       .eq('project_id', projectId)
-      .order('version_date', { ascending: false });
+      .order("version_date", { ascending: false });
 
     if (error) throw error;
     return surveys || [];
+  },
+
+  /**
+   * Fetch ALL surveys across ALL projects.
+   */
+  async getAllSurveys() {
+    const { data: surveys, error } = await supabase
+      .from('survey_packages')
+      .select('*, projects(name), crfs(count)')
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+    return surveys || [];
+  },
+
+  /**
+   * Generates a signed download URL for a survey package zip file.
+   * valid for 1 hour.
+   */
+  async getSurveyDownloadUrl(filePath: string): Promise<string | null> {
+    const { data, error } = await supabase.storage
+      .from('surveys')
+      .createSignedUrl(filePath, 3600);
+
+    if (error) {
+      console.error('Error generating download URL:', error);
+      return null;
+    }
+
+    return data.signedUrl;
   }
 };

@@ -56,10 +56,6 @@ const Index = () => {
           {/* Content */}
           <div className="relative z-10 container mx-auto px-6 pt-20">
             <div className="max-w-3xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent/10 border border-accent/20 text-accent mb-6">
-                <Shield className="h-4 w-4" />
-                <span className="text-sm font-medium">Enterprise-Grade Security</span>
-              </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-accent mb-6 leading-tight">
                 Collect Data Anywhere.
@@ -92,7 +88,7 @@ const Index = () => {
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 bg-accent/10 text-accent text-sm">
                   <Shield className="h-4 w-4" />
-                  Secure & Compliant
+                  Secure
                 </div>
               </div>
             </div>

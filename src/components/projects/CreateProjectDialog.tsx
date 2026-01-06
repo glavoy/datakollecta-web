@@ -36,12 +36,22 @@ const CreateProjectDialog = ({ open, onOpenChange, onSubmit, loading }: CreatePr
   }, [open]);
 
   const handleNameChange = (name: string) => {
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    // Only auto-generate slug if it hasn't been manually edited yet
+    // For now, we'll just update the name and let the user type the code if they want,
+    // or we could auto-fill it if the slug box is empty.
+    // Let's go with: if slug is empty, auto-fill.
+    setFormData(prev => {
+      const newSlug = prev.slug === "" || prev.slug === prev.name.toLowerCase().replace(/[^a-z0-9_]/g, "")
+        ? name.toLowerCase().replace(/[^a-z0-9_]/g, "")
+        : prev.slug;
+      return { ...prev, name };
+    });
+  };
 
-    setFormData({ ...formData, name, slug });
+  const handleSlugChange = (value: string) => {
+    // Force lowercase and only allow letters, numbers, underscores, and hyphens
+    const slug = value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    setFormData(prev => ({ ...prev, slug }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,15 +86,14 @@ const CreateProjectDialog = ({ open, onOpenChange, onSubmit, loading }: CreatePr
               <Label htmlFor="slug">Project Code*</Label>
               <Input
                 id="slug"
-                placeholder="Auto-generated from name"
+                placeholder="e.g., prism-study-2024"
                 value={formData.slug}
+                onChange={(e) => handleSlugChange(e.target.value)}
                 required
-                disabled
-                readOnly
-                className="bg-muted"
+                disabled={loading}
               />
               <p className="text-xs text-muted-foreground">
-                Auto-generated from project name - used in URLs and for field worker identification
+                Short, memorable code (letters, numbers, underscores, hyphens). No spaces.
               </p>
             </div>
 

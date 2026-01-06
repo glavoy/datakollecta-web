@@ -21,11 +21,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { 
-  Plus, 
-  Settings, 
-  FileCode, 
-  Trash2, 
+import {
+  Plus,
+  Settings,
+  FileCode,
+  Trash2,
   MoreVertical,
   FileSpreadsheet,
   Copy,
@@ -78,7 +78,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
       forms: [createDefaultForm()],
     }
   );
-  
+
   const [activeFormId, setActiveFormId] = useState<string>(surveyPackage.forms[0]?.id || '');
   const [showAddQuestion, setShowAddQuestion] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<SurveyQuestion | null>(null);
@@ -106,7 +106,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
     onSave?.(updated);
   };
 
-  const handleSaveToProject = async () => {
+  const handleSaveToProject = async (status: 'draft' | 'active' = 'draft') => {
     if (!projectId || !userId) {
       toast({
         title: "Cannot save",
@@ -129,12 +129,13 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
         projectId,
         userId,
         surveyDisplayName,
-        surveyName
+        surveyName,
+        status
       );
 
       toast({
         title: "Success",
-        description: "Survey package saved to project successfully.",
+        description: `Survey package ${status === 'active' ? 'published' : 'saved'} successfully.`,
       });
     } catch (error: any) {
       console.error('Error saving survey:', error);
@@ -150,7 +151,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
 
   const updateForm = (formId: string, updates: Partial<SurveyForm>) => {
     updatePackage({
-      forms: surveyPackage.forms.map(f => 
+      forms: surveyPackage.forms.map(f =>
         f.id === formId ? { ...f, ...updates } : f
       )
     });
@@ -198,7 +199,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
   const handleSaveQuestion = (question: SurveyQuestion) => {
     if (!activeForm) return;
     updateForm(activeFormId, {
-      questions: activeForm.questions.map(q => 
+      questions: activeForm.questions.map(q =>
         q.id === question.id ? question : q
       )
     });
@@ -251,17 +252,26 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
           <Badge variant="outline">v{surveyPackage.version}</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleSaveToProject} 
+          <Button
+            variant="ghost"
+            onClick={() => handleSaveToProject('draft')}
             disabled={!projectId || isSaving}
+            size="sm"
+          >
+            Save Draft
+          </Button>
+          <Button
+            variant="default"
+            onClick={() => handleSaveToProject('active')}
+            disabled={!projectId || isSaving}
+            size="sm"
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <CloudUpload className="h-4 w-4 mr-2" />
             )}
-            Save to Project
+            Publish
           </Button>
           <Button variant="outline" onClick={() => setShowXmlPreview(true)}>
             <FileCode className="h-4 w-4 mr-2" />
@@ -316,7 +326,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
                           <Copy className="h-4 w-4 mr-2" />
                           Duplicate Form
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => setDeleteFormId(form.id)}
                           className="text-destructive"
                           disabled={surveyPackage.forms.length <= 1}
@@ -394,8 +404,8 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
                     </CardHeader>
                     <CardContent>
                       <QuestionTypeSelector onSelect={handleAddQuestion} />
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         className="mt-4 w-full"
                         onClick={() => setShowAddQuestion(false)}
                       >
@@ -404,8 +414,8 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
                     </CardContent>
                   </Card>
                 ) : form.questions.length > 0 && (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full border-dashed"
                     onClick={() => setShowAddQuestion(true)}
                   >
@@ -458,7 +468,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => deleteFormId && deleteForm(deleteFormId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

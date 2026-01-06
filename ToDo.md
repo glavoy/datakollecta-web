@@ -1,3 +1,7 @@
+# To Do
+
+- Force all users to use MFA
+
 
 ## To delete a user
 ### Option 1: Cascade Delete (Delete user and all their data)

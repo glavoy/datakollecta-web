@@ -34,3 +34,6 @@ dist-ssr
 md
 sql
 enrollee.xml
+
+# Windows null device file (created by some build tools)
+nul
