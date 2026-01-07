@@ -1,4 +1,43 @@
-# Database Schema and Policies
+# System Architecture & Database Schema
+
+## Table Descriptions
+
+Here is the breakdown of what each table does in your system:
+
+### 1. Hierarchy & Access
+
+* **profiles**: Website Users. This is YOU (and your colleagues). It stores your name/email extensions.
+* **projects**: The main folder. Everything belongs to a project.
+* **project_members**: The Access List. It links a Profile to a Project. If you aren't in this table for Project X, you can't see Project X.
+
+### 2. The Survey Definitions
+* **survey_packages**: The Zip File/Bundle. When you upload a survey design, it creates a row here. It represents "Version 1 of the Malaria Survey".
+* **crfs**: The Forms. If your survey package has 3 parts (Household, Person, Blood Sample), you will have 3 rows here describing the structure of each form.
+
+### 3. The Field App (Data Collectors)
+* **app_credentials**: Field Worker Accounts. These are the simple login codes (e.g., surveyor1) that data collectors type into the Android app. They are distinct from website users.
+* **app_sessions**: Active Devices. When a phone logs in, it creates a session here.
+
+### 4. The Data
+* **submissions**: The Answers. Every time a form is completed and synced, it lands here. The actual data (answers) is stored in a JSON column.
+* **submission_history**: The Audit Trail. If you edit a submission on the website, the old version is saved here so you never lose data.
+
+---
+
+
+### General flow
+- create new login
+- create a new project
+    - after creating a new project, there are records in two tables: `projects`, `project_members`
+- in the new project - upload a 'survey' zip file
+    - this creates records in the tables: `survey_packages`, `crfs`
+- create a 'team member' - under add credentials ion teh team member tab - this creats a record in the table: `app_credentials`
+- team member enters credentials on the phone and checks for surveys - writes record to the `app_sessions` table
+- fgg
+
+
+
+## Technical Schema
 
 ### 1. Database Column Schema
 
@@ -46,7 +85,6 @@ SELECT table_name, column_name, data_type, is_nullable FROM information_schema.c
 | profiles | id | uuid | NO |
 | profiles | email | text | NO |
 | profiles | full_name | text | YES |
-| profiles | organization | text | YES |
 | profiles | role | text | YES |
 | profiles | created_at | timestamp with time zone | YES |
 | profiles | updated_at | timestamp with time zone | YES |

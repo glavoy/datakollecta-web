@@ -6,7 +6,6 @@ interface UserProfile {
   id: string;
   email: string;
   full_name?: string;
-  organization?: string;
   role?: string;
   created_at?: string;
 }

@@ -1,6 +1,10 @@
 # To Do
 
 - Force all users to use MFA
+- ensure the invited_by column in the project_members table gets populated when adding someone to a project
+- 'Teams' actually refers to field data collectors - change wording on the website - and maybe just set up one set of credentials per project - maybe a unique user for each interviewer/surveyor
+- have to go to 'Add credential' in the 'Field teams' tab to add a field user - rethink this- can - upload a zip file works, but need to test creating a survey from scratch to see if it saves properly
+- there is no way to change the password of a field user - need to delete and recreate
 
 
 ## To delete a user

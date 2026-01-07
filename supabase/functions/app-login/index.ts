@@ -15,7 +15,7 @@ serve(async (req) => {
     }
 
     try {
-        const { project_code, username, password } = await req.json();
+        const { project_code, username, password, device_id, device_info } = await req.json();
 
         // Validate input
         if (!project_code || !username || !password) {
@@ -116,6 +116,8 @@ serve(async (req) => {
             project_id: project.id,
             token: token,
             expires_at: expiresAt.toISOString(),
+            device_id: device_id || null,
+            device_info: device_info || null,
         });
 
         // 8. Return success response
