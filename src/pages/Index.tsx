@@ -72,7 +72,7 @@ const Index = () => {
                   <Link to="/login">Sign In</Link>
                 </Button>
                 <Button size="xl" variant="hero" asChild>
-                  <Link to="/login">Sign Up</Link>
+                  <Link to="/login" state={{ isSignUp: true }}>Sign Up</Link>
                 </Button>
               </div>
 
