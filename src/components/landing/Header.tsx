@@ -9,7 +9,7 @@ const Header = () => {
         <Link to="/" className="flex items-center gap-4">
           <img src="/logo.png" alt="DataKollecta" className="h-28 w-auto" />
         </Link>
-        
+
         <nav className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
             Features
@@ -21,13 +21,13 @@ const Header = () => {
             Use Cases
           </a>
         </nav>
-        
+
         <div className="flex items-center gap-3">
           <Button variant="ghost" asChild>
             <Link to="/login">Sign In</Link>
           </Button>
           <Button asChild>
-            <Link to="/dashboard">Get Started</Link>
+            <Link to="/app/projects">Get Started</Link>
           </Button>
         </div>
       </div>

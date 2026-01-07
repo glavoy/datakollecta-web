@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -73,12 +73,12 @@ const ProjectDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const [project, setProject] = useState<Project | null>(null);
   const [surveys, setSurveys] = useState<SurveyPackage[]>([]);
   const [crfCount, setCrfCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  
+
   // Upload State
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -96,7 +96,7 @@ const ProjectDetail = () => {
 
     try {
       setLoading(true);
-      
+
       // 1. Fetch project
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
@@ -134,7 +134,7 @@ const ProjectDetail = () => {
         description: "Failed to load project details.",
         variant: "destructive",
       });
-      navigate('/dashboard/projects');
+      navigate('/app/projects');
     } finally {
       setLoading(false);
     }
@@ -152,7 +152,7 @@ const ProjectDetail = () => {
 
     try {
       const signedUrl = await surveyService.getSurveyDownloadUrl(filePath);
-      
+
       if (!signedUrl) {
         throw new Error("Could not generate download URL.");
       }
@@ -213,7 +213,7 @@ const ProjectDetail = () => {
       // 1. Validate ZIP
       const zip = new JSZip();
       const loadedZip = await zip.loadAsync(uploadFile);
-      
+
       let manifestFile = null;
       let manifestPath = "";
 
@@ -232,7 +232,7 @@ const ProjectDetail = () => {
       // @ts-ignore
       const manifestContent = await manifestFile.async("string");
       const manifest = JSON.parse(manifestContent);
-      
+
       // VALIDATE MANIFEST CRFS
       if (!manifest.crfs || !Array.isArray(manifest.crfs) || manifest.crfs.length === 0) {
         throw new Error("Invalid Manifest: 'crfs' array is missing or empty.");
@@ -267,11 +267,11 @@ const ProjectDetail = () => {
 
       // 4. Process CRFs and their XML files
       const crfsToInsert = [];
-      
+
       for (const crfEntry of manifest.crfs) {
         const xmlFileName = `${crfEntry.tablename}.xml`;
         let xmlFile = null;
-        
+
         // Find XML file in ZIP (might be in a subdirectory)
         loadedZip.forEach((path, file) => {
           if (path.toLowerCase().endsWith(xmlFileName.toLowerCase())) {
@@ -334,11 +334,11 @@ const ProjectDetail = () => {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <AppLayout>
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      </DashboardLayout>
+      </AppLayout>
     );
   }
 
@@ -347,11 +347,11 @@ const ProjectDetail = () => {
   }
 
   return (
-    <DashboardLayout>
+    <AppLayout>
       <div className="space-y-8">
         {/* Header with Back Button */}
         <div className="space-y-4">
-          <Link to="/dashboard/projects">
+          <Link to="/app/projects">
             <Button variant="ghost" size="sm" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back to Projects
@@ -447,22 +447,22 @@ const ProjectDetail = () => {
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
                           <Label htmlFor="versionName">Version Name</Label>
-                          <Input 
-                            id="versionName" 
-                            placeholder={`e.g., ${project.slug}_v1`} 
+                          <Input
+                            id="versionName"
+                            placeholder={`e.g., ${project.slug}_v1`}
                             value={uploadVersionName}
                             onChange={(e) => setUploadVersionName(e.target.value)}
-                            required 
+                            required
                           />
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="file">Survey ZIP File</Label>
-                          <Input 
-                            id="file" 
-                            type="file" 
+                          <Input
+                            id="file"
+                            type="file"
                             accept=".zip"
                             onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                            required 
+                            required
                           />
                         </div>
                       </div>
@@ -475,8 +475,8 @@ const ProjectDetail = () => {
                     </form>
                   </DialogContent>
                 </Dialog>
-                
-                <Button onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}>
+
+                <Button onClick={() => navigate(`/app/projects/${project.slug}/surveys/new`)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Create New Survey
                 </Button>
@@ -495,7 +495,7 @@ const ProjectDetail = () => {
                       Create a new survey using the designer or upload an existing package.
                     </p>
                   </div>
-                  <Button onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/new`)}>
+                  <Button onClick={() => navigate(`/app/projects/${project.slug}/surveys/new`)}>
                     Create First Survey
                   </Button>
                 </CardContent>
@@ -530,7 +530,7 @@ const ProjectDetail = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/projects/${project.slug}/surveys/${survey.id}`)}>
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/app/projects/${project.slug}/surveys/${survey.id}`)}>
                               <Edit2 className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon">
@@ -551,7 +551,7 @@ const ProjectDetail = () => {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction 
+                                  <AlertDialogAction
                                     onClick={() => handleDeleteSurvey(survey.id)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   >
@@ -617,7 +617,7 @@ const ProjectDetail = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
+    </AppLayout>
   );
 };
 

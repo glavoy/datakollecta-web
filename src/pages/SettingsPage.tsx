@@ -1,11 +1,11 @@
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { 
+import {
   User,
   Bell,
   Shield,
@@ -14,7 +14,7 @@ import {
 
 const SettingsPage = () => {
   return (
-    <DashboardLayout>
+    <AppLayout>
       <div className="space-y-8 max-w-3xl">
         {/* Header */}
         <div>
@@ -135,7 +135,7 @@ const SettingsPage = () => {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </AppLayout>
   );
 };
 

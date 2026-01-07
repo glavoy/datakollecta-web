@@ -32,13 +32,13 @@ const AuthCallback = () => {
           // Redirect based on type
           if (type === 'signup') {
             // Redirect to dashboard after signup verification
-            navigate('/dashboard/projects', { replace: true });
+            navigate('/app/projects', { replace: true });
           } else if (type === 'recovery') {
             // Redirect to password reset page
             navigate('/reset-password', { replace: true });
           } else {
             // Default redirect to dashboard
-            navigate('/dashboard/projects', { replace: true });
+            navigate('/app/projects', { replace: true });
           }
         } else {
           setError('Invalid callback parameters');

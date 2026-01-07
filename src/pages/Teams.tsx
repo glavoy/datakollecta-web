@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,7 @@ const Teams = () => {
   const activeCount = workers.filter(w => w.is_active).length;
 
   return (
-    <DashboardLayout>
+    <AppLayout>
       <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -188,7 +188,7 @@ const Teams = () => {
         onOpenChange={setIsAddDialogOpen}
         onSuccess={loadWorkers}
       />
-    </DashboardLayout>
+    </AppLayout>
   );
 };
 

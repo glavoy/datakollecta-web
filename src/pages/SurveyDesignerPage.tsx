@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import AppLayout from "@/components/layout/AppLayout";
 import SurveyDesigner from "@/components/survey-designer/SurveyDesigner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -24,7 +24,7 @@ const SurveyDesignerPage = () => {
 
       try {
         setLoading(true);
-        
+
         // 1. Fetch project ID from slug
         const { data: projectData, error: projectError } = await supabase
           .from('projects')
@@ -39,12 +39,12 @@ const SurveyDesignerPage = () => {
               description: "This project doesn't exist or you don't have access to it.",
               variant: "destructive",
             });
-            navigate('/dashboard/projects');
+            navigate('/app/projects');
             return;
           }
           throw projectError;
         }
-        
+
         const pid = projectData.id;
         setProjectId(pid);
 
@@ -61,7 +61,7 @@ const SurveyDesignerPage = () => {
               description: "Failed to load the requested survey.",
               variant: "destructive",
             });
-            navigate(`/dashboard/projects/${slug}`);
+            navigate(`/app/projects/${slug}`);
           }
         } else {
           // Create New Survey - Start Fresh
@@ -90,24 +90,24 @@ const SurveyDesignerPage = () => {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <AppLayout>
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      </DashboardLayout>
+      </AppLayout>
     );
   }
 
   return (
-    <DashboardLayout>
+    <AppLayout>
       <div className="h-[calc(100vh-8rem)]">
-        <SurveyDesigner 
-          projectId={projectId} 
-          userId={user?.id} 
-          initialPackage={initialPackage} 
+        <SurveyDesigner
+          projectId={projectId}
+          userId={user?.id}
+          initialPackage={initialPackage}
         />
       </div>
-    </DashboardLayout>
+    </AppLayout>
   );
 };
 

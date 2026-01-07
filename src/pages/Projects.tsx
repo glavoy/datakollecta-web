@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -152,7 +152,7 @@ const Projects = () => {
       fetchProjects(); // Refresh the list
     } catch (error: any) {
       console.error("Error creating project:", error);
-      
+
       let errorMessage = error.message || "Failed to create project";
       if (error.code === '23505' || errorMessage.includes('unique') || errorMessage.includes('slug')) {
         errorMessage = "This project code is already taken. Please choose another.";
@@ -174,7 +174,7 @@ const Projects = () => {
     project.slug.toLowerCase().includes(searchQuery.toLowerCase())
   );
   return (
-    <DashboardLayout>
+    <AppLayout>
       <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -236,7 +236,7 @@ const Projects = () => {
               <Card
                 key={project.id}
                 className="bg-card border-border hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/dashboard/projects/${project.slug}`)}
+                onClick={() => navigate(`/app/projects/${project.slug}`)}
               >
                 <CardHeader className="flex flex-row items-start justify-between">
                   <div className="space-y-1">
@@ -267,7 +267,7 @@ const Projects = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/projects/${project.slug}`); }}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/app/projects/${project.slug}`); }}>
                         View Project
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
@@ -311,7 +311,7 @@ const Projects = () => {
         onSubmit={handleCreateProject}
         loading={creating}
       />
-    </DashboardLayout>
+    </AppLayout>
   );
 };
 

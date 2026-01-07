@@ -1,10 +1,10 @@
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { 
-  Search, 
+import {
+  Search,
   Download,
   Filter,
   MoreVertical,
@@ -33,8 +33,8 @@ import {
 } from "@/components/ui/select";
 
 const submissions = [
-  { 
-    id: "SUB-001247", 
+  {
+    id: "SUB-001247",
     form: "Patient Intake",
     project: "Clinical Trial Alpha",
     surveyor: "team_alpha_1",
@@ -42,8 +42,8 @@ const submissions = [
     syncedAt: "2024-01-18 14:35",
     status: "verified"
   },
-  { 
-    id: "SUB-001246", 
+  {
+    id: "SUB-001246",
     form: "Follow-up Assessment",
     project: "Clinical Trial Alpha",
     surveyor: "nurse_station_2",
@@ -51,8 +51,8 @@ const submissions = [
     syncedAt: "2024-01-18 14:20",
     status: "verified"
   },
-  { 
-    id: "SUB-001245", 
+  {
+    id: "SUB-001245",
     form: "Household Survey",
     project: "Field Study Beta",
     surveyor: "field_surveyor_1",
@@ -60,8 +60,8 @@ const submissions = [
     syncedAt: "2024-01-18 12:30",
     status: "pending_review"
   },
-  { 
-    id: "SUB-001244", 
+  {
+    id: "SUB-001244",
     form: "Water Quality Assessment",
     project: "Community Health",
     surveyor: "community_worker_1",
@@ -69,8 +69,8 @@ const submissions = [
     syncedAt: "2024-01-18 11:45",
     status: "verified"
   },
-  { 
-    id: "SUB-001243", 
+  {
+    id: "SUB-001243",
     form: "Nutrition Screening",
     project: "Community Health",
     surveyor: "community_worker_1",
@@ -88,7 +88,7 @@ const statusColors: Record<string, "default" | "secondary" | "destructive" | "ou
 
 const DataView = () => {
   return (
-    <DashboardLayout>
+    <AppLayout>
       <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -112,8 +112,8 @@ const DataView = () => {
         <div className="flex flex-wrap items-center gap-4">
           <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search submissions..." 
+            <Input
+              placeholder="Search submissions..."
               className="pl-10"
             />
           </div>
@@ -203,7 +203,7 @@ const DataView = () => {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </AppLayout>
   );
 };
 

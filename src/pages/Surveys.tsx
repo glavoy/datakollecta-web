@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +83,7 @@ const Surveys = () => {
   );
 
   return (
-    <DashboardLayout>
+    <AppLayout>
       <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -93,7 +93,7 @@ const Surveys = () => {
           </div>
           <div className="flex gap-3">
             <Button asChild>
-              <a href="/dashboard/surveys/designer">
+              <a href="/app/surveys/designer">
                 <Plus className="h-4 w-4 mr-2" />
                 New Survey
               </a>
@@ -182,7 +182,7 @@ const Surveys = () => {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </AppLayout>
   );
 };
 

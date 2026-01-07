@@ -28,7 +28,7 @@ const Login = () => {
   const navigate = useNavigate();
 
   // Get the page user was trying to access
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard/projects";
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/app/projects";
 
   const handlePortalLogin = async (e: React.FormEvent) => {
     e.preventDefault();
