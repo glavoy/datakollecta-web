@@ -71,6 +71,9 @@ export const teamService = {
   /**
    * Toggle active status
    */
+  /**
+   * Toggle active status
+   */
     async toggleStatus(credentialId: string, isActive: boolean) {
         const { error } = await supabase
         .from("app_credentials")
@@ -78,5 +81,18 @@ export const teamService = {
         .eq("id", credentialId);
     
         if (error) throw error;
+    },
+
+  /**
+   * Fetch all projects
+   */
+    async getProjects() {
+        const { data, error } = await supabase
+            .from("projects")
+            .select("*")
+            .order("name");
+
+        if (error) throw error;
+        return data || [];
     }
 };

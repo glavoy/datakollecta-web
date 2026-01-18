@@ -239,7 +239,7 @@ const ProjectDetail = () => {
       }
 
       // 2. Upload to Storage
-      const filePath = `surveys/${project.id}/${Date.now()}_${uploadFile.name}`;
+      const filePath = `surveys/${project.id}/${uploadFile.name}`;
       const { error: storageError } = await supabase.storage
         .from('surveys')
         .upload(filePath, uploadFile);

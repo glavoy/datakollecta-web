@@ -5,6 +5,8 @@
 - 'Teams' actually refers to field data collectors - change wording on the website - and maybe just set up one set of credentials per project - maybe a unique user for each interviewer/surveyor
 - have to go to 'Add credential' in the 'Field teams' tab to add a field user - rethink this- can - upload a zip file works, but need to test creating a survey from scratch to see if it saves properly
 - there is no way to change the password of a field user - need to delete and recreate
+- round the corners of the question cards
+- add a 'whitelist' of email addresses that can log in/create a user account on the website
 
 
 ## To delete a user
