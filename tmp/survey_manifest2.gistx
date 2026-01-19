@@ -1,0 +1,24 @@
+{
+  "surveyName": "R21 Test Negative Data Kollecta",
+  "surveyId": "r21_test_negative_data_kollecta",
+  "databaseName": "r21_test_negative_data_kollecta.sqlite",
+  "xmlFiles": [
+    "enrollee.xml"
+  ],
+  "crfs": [
+    {
+      "display_order": 10,
+      "tablename": "enrollee",
+      "displayname": "Enrollee",
+      "isbase": 1,
+      "primarykey": "subjid",
+      "linkingfield": "subjid",
+      "idconfig": {
+        "prefix": "",
+        "fields": [{"name":"deviceid","length":3},{"name":"mrc","length":3}],
+        "incrementLength": 4
+      },
+      "display_fields": "startdate,participantsname"
+    }
+  ]
+}

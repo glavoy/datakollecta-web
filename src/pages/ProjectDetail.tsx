@@ -182,6 +182,70 @@ const ProjectDetail = () => {
 
   const handleDeleteSurvey = async (surveyId: string) => {
     try {
+      // 1. Find the survey to get the file path
+      const surveyToDelete = surveys.find(s => s.id === surveyId);
+
+      if (surveyToDelete && surveyToDelete.zip_file_path) {
+        // 2. Delete from Storage
+        const { error: storageError } = await supabase.storage
+          .from('surveys')
+          .remove([surveyToDelete.zip_file_path]);
+
+        if (storageError) {
+          console.error("Error deleting file from storage:", storageError);
+          // We continue to delete the record even if storage delete fails
+        }
+      }
+
+      // 3. Delete dependent Submissions and History
+      // First, get all submission IDs and local_unique_ids for this survey
+      const { data: submissionsData } = await supabase
+        .from('submissions')
+        .select('id, local_unique_id')
+        .eq('survey_package_id', surveyId);
+
+      if (submissionsData && submissionsData.length > 0) {
+        // Map local_unique_ids to delete from formchanges (where record_uuid = local_unique_id)
+        const recordUuids = submissionsData
+          .map(s => s.local_unique_id)
+          .filter(id => id !== null); // Filter out nulls just in case
+
+        if (recordUuids.length > 0) {
+          const { error: historyError } = await supabase
+            .from('formchanges')
+            .delete()
+            .in('record_uuid', recordUuids);
+
+          if (historyError) {
+            console.error("Error deleting formchanges:", historyError);
+            throw historyError;
+          }
+        }
+
+        // Delete submissions
+        const { error: submissionsError } = await supabase
+          .from('submissions')
+          .delete()
+          .eq('survey_package_id', surveyId);
+
+        if (submissionsError) {
+          console.error("Error deleting submissions:", submissionsError);
+          throw submissionsError;
+        }
+      }
+
+      // 4. Delete dependent CRFs (Forms) manually
+      const { error: crfDeleteError } = await supabase
+        .from('crfs')
+        .delete()
+        .eq('survey_package_id', surveyId);
+
+      if (crfDeleteError) {
+        console.error("Error deleting CRFs:", crfDeleteError);
+        throw crfDeleteError;
+      }
+
+      // 5. Delete from Database (The Survey Package itself)
       const { error } = await supabase
         .from('survey_packages')
         .delete()
@@ -191,10 +255,11 @@ const ProjectDetail = () => {
 
       toast({
         title: "Survey deleted",
-        description: "The survey package has been removed.",
+        description: "The survey package and its file have been removed.",
       });
       fetchProjectData();
     } catch (error: any) {
+      console.error("Delete error:", error);
       toast({
         title: "Error",
         description: "Failed to delete survey.",

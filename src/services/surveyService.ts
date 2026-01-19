@@ -126,6 +126,7 @@ export const surveyService = {
         questions: crf.fields || [],
         autoStartRepeat: crf.auto_start_repeat || 0,
         repeatEnforceCount: crf.repeat_enforce_count || 1,
+        primaryKey: crf.primary_key,
       }))
     };
   },

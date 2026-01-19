@@ -7,6 +7,9 @@
 - there is no way to change the password of a field user - need to delete and recreate
 - round the corners of the question cards
 - add a 'whitelist' of email addresses that can log in/create a user account on the website
+- on the login page, add option of viewing the password
+- when createing a form, don't allow 'keywords' - formerly automatic variables - starttime, etc.
+- 'View history' not working properly - should only show changed records from current record - uuid == uuid
 
 
 ## To delete a user

@@ -43,107 +43,111 @@ Here is the breakdown of what each table does in your system:
 
 **Query:**
 ```sql
-SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' ORDER BY table_name, ordinal_position;
+SELECT table_name, ordinal_position, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+ORDER BY table_name, ordinal_position;
 ```
 
-| table_name | column_name | data_type | is_nullable |
-| :--- | :--- | :--- | :--- |
-| app_credentials | id | uuid | NO |
-| app_credentials | project_id | uuid | NO |
-| app_credentials | username | text | NO |
-| app_credentials | password_hash | text | NO |
-| app_credentials | description | text | YES |
-| app_credentials | is_active | boolean | YES |
-| app_credentials | created_by | uuid | YES |
-| app_credentials | created_at | timestamp with time zone | YES |
-| app_credentials | last_used_at | timestamp with time zone | YES |
-| app_sessions | id | uuid | NO |
-| app_sessions | credential_id | uuid | YES |
-| app_sessions | project_id | uuid | YES |
-| app_sessions | token | text | NO |
-| app_sessions | device_id | text | YES |
-| app_sessions | device_info | jsonb | YES |
-| app_sessions | created_at | timestamp with time zone | YES |
-| app_sessions | expires_at | timestamp with time zone | NO |
-| app_sessions | last_activity_at | timestamp with time zone | YES |
-| crfs | id | uuid | NO |
-| crfs | survey_package_id | uuid | NO |
-| crfs | project_id | uuid | NO |
-| crfs | table_name | text | NO |
-| crfs | display_name | text | NO |
-| crfs | display_order | integer | YES |
-| crfs | is_base | boolean | YES |
-| crfs | primary_key | text | YES |
-| crfs | linking_field | text | YES |
-| crfs | parent_table | text | YES |
-| crfs | fields | jsonb | YES |
-| crfs | id_config | jsonb | YES |
-| crfs | display_fields | text | YES |
-| crfs | auto_start_repeat | boolean | YES |
-| crfs | repeat_enforce_count | integer | YES |
-| crfs | created_at | timestamp with time zone | YES |
-| profiles | id | uuid | NO |
-| profiles | email | text | NO |
-| profiles | full_name | text | YES |
-| profiles | role | text | YES |
-| profiles | created_at | timestamp with time zone | YES |
-| profiles | updated_at | timestamp with time zone | YES |
-| project_members | id | uuid | NO |
-| project_members | project_id | uuid | YES |
-| project_members | user_id | uuid | YES |
-| project_members | role | USER-DEFINED | NO |
-| project_members | invited_by | uuid | YES |
-| project_members | invited_at | timestamp with time zone | YES |
-| project_members | accepted_at | timestamp with time zone | YES |
-| projects | id | uuid | NO |
-| projects | name | text | NO |
-| projects | description | text | YES |
-| projects | slug | text | NO |
-| projects | status | text | YES |
-| projects | created_by | uuid | YES |
-| projects | created_at | timestamp with time zone | YES |
-| projects | updated_at | timestamp with time zone | YES |
-| projects | is_active | boolean | YES |
-| submission_history | id | uuid | NO |
-| submission_history | submission_id | uuid | YES |
-| submission_history | data | jsonb | NO |
-| submission_history | version | integer | NO |
-| submission_history | change_type | text | NO |
-| submission_history | changed_fields | jsonb | YES |
-| submission_history | changed_by | text | YES |
-| submission_history | changed_on_device | text | YES |
-| submission_history | changed_at | timestamp with time zone | YES |
-| submission_history | synced_at | timestamp with time zone | YES |
-| submissions | id | uuid | NO |
-| submissions | project_id | uuid | NO |
-| submissions | survey_package_id | uuid | NO |
-| submissions | crf_id | uuid | YES |
-| submissions | table_name | text | NO |
-| submissions | record_id | text | YES |
-| submissions | local_unique_id | text | NO |
-| submissions | data | jsonb | NO |
-| submissions | version | integer | YES |
-| submissions | parent_table | text | YES |
-| submissions | parent_record_id | text | YES |
-| submissions | device_id | text | YES |
-| submissions | surveyor_id | text | YES |
-| submissions | app_version | text | YES |
-| submissions | collected_at | timestamp with time zone | YES |
-| submissions | submitted_at | timestamp with time zone | YES |
-| submissions | updated_at | timestamp with time zone | YES |
-| survey_packages | id | uuid | NO |
-| survey_packages | project_id | uuid | YES |
-| survey_packages | name | text | NO |
-| survey_packages | display_name | text | NO |
-| survey_packages | version_date | date | NO |
-| survey_packages | description | text | YES |
-| survey_packages | zip_file_path | text | YES |
-| survey_packages | manifest | jsonb | YES |
-| survey_packages | status | USER-DEFINED | YES |
-| survey_packages | created_by | uuid | YES |
-| survey_packages | created_at | timestamp with time zone | YES |
-| survey_packages | updated_at | timestamp with time zone | YES |
-| survey_packages | published_at | timestamp with time zone | YES |
+| table_name      | ordinal_position | column_name          | data_type                |
+| --------------- | ---------------- | -------------------- | ------------------------ |
+| app_credentials | 1                | id                   | uuid                     |
+| app_credentials | 2                | project_id           | uuid                     |
+| app_credentials | 3                | username             | text                     |
+| app_credentials | 4                | password_hash        | text                     |
+| app_credentials | 5                | description          | text                     |
+| app_credentials | 6                | is_active            | boolean                  |
+| app_credentials | 7                | created_by           | uuid                     |
+| app_credentials | 8                | created_at           | timestamp with time zone |
+| app_credentials | 9                | last_used_at         | timestamp with time zone |
+| app_sessions    | 1                | id                   | uuid                     |
+| app_sessions    | 2                | credential_id        | uuid                     |
+| app_sessions    | 3                | project_id           | uuid                     |
+| app_sessions    | 4                | token                | text                     |
+| app_sessions    | 5                | device_id            | text                     |
+| app_sessions    | 6                | device_info          | jsonb                    |
+| app_sessions    | 7                | created_at           | timestamp with time zone |
+| app_sessions    | 8                | expires_at           | timestamp with time zone |
+| app_sessions    | 9                | last_activity_at     | timestamp with time zone |
+| crfs            | 1                | id                   | uuid                     |
+| crfs            | 2                | survey_package_id    | uuid                     |
+| crfs            | 3                | project_id           | uuid                     |
+| crfs            | 4                | table_name           | text                     |
+| crfs            | 5                | display_name         | text                     |
+| crfs            | 6                | display_order        | integer                  |
+| crfs            | 7                | is_base              | boolean                  |
+| crfs            | 8                | primary_key          | text                     |
+| crfs            | 9                | linking_field        | text                     |
+| crfs            | 10               | parent_table         | text                     |
+| crfs            | 11               | fields               | jsonb                    |
+| crfs            | 12               | id_config            | jsonb                    |
+| crfs            | 13               | display_fields       | text                     |
+| crfs            | 14               | auto_start_repeat    | boolean                  |
+| crfs            | 15               | repeat_enforce_count | integer                  |
+| crfs            | 16               | created_at           | timestamp with time zone |
+| formchanges     | 1                | id                   | uuid                     |
+| formchanges     | 2                | formchanges_uuid     | text                     |
+| formchanges     | 3                | project_id           | uuid                     |
+| formchanges     | 4                | record_uuid          | text                     |
+| formchanges     | 5                | tablename            | text                     |
+| formchanges     | 6                | fieldname            | text                     |
+| formchanges     | 7                | oldvalue             | text                     |
+| formchanges     | 8                | newvalue             | text                     |
+| formchanges     | 9                | surveyor_id          | text                     |
+| formchanges     | 10               | changed_at           | timestamp with time zone |
+| formchanges     | 11               | synced_at            | timestamp with time zone |
+| profiles        | 1                | id                   | uuid                     |
+| profiles        | 2                | email                | text                     |
+| profiles        | 3                | full_name            | text                     |
+| profiles        | 5                | role                 | text                     |
+| profiles        | 6                | created_at           | timestamp with time zone |
+| profiles        | 7                | updated_at           | timestamp with time zone |
+| project_members | 1                | id                   | uuid                     |
+| project_members | 2                | project_id           | uuid                     |
+| project_members | 3                | user_id              | uuid                     |
+| project_members | 4                | role                 | USER-DEFINED             |
+| project_members | 5                | invited_by           | uuid                     |
+| project_members | 6                | invited_at           | timestamp with time zone |
+| project_members | 7                | accepted_at          | timestamp with time zone |
+| projects        | 1                | id                   | uuid                     |
+| projects        | 2                | name                 | text                     |
+| projects        | 3                | description          | text                     |
+| projects        | 4                | slug                 | text                     |
+| projects        | 5                | status               | text                     |
+| projects        | 6                | created_by           | uuid                     |
+| projects        | 7                | created_at           | timestamp with time zone |
+| projects        | 8                | updated_at           | timestamp with time zone |
+| projects        | 9                | is_active            | boolean                  |
+| submissions     | 1                | id                   | uuid                     |
+| submissions     | 2                | project_id           | uuid                     |
+| submissions     | 3                | survey_package_id    | uuid                     |
+| submissions     | 4                | crf_id               | uuid                     |
+| submissions     | 5                | table_name           | text                     |
+| submissions     | 6                | record_id            | text                     |
+| submissions     | 7                | local_unique_id      | text                     |
+| submissions     | 8                | data                 | jsonb                    |
+| submissions     | 9                | version              | integer                  |
+| submissions     | 10               | parent_table         | text                     |
+| submissions     | 11               | parent_record_id     | text                     |
+| submissions     | 12               | device_id            | text                     |
+| submissions     | 13               | surveyor_id          | text                     |
+| submissions     | 14               | app_version          | text                     |
+| submissions     | 15               | collected_at         | timestamp with time zone |
+| submissions     | 16               | submitted_at         | timestamp with time zone |
+| submissions     | 17               | updated_at           | timestamp with time zone |
+| survey_packages | 1                | id                   | uuid                     |
+| survey_packages | 2                | project_id           | uuid                     |
+| survey_packages | 3                | name                 | text                     |
+| survey_packages | 4                | display_name         | text                     |
+| survey_packages | 5                | version_date         | date                     |
+| survey_packages | 6                | description          | text                     |
+| survey_packages | 7                | zip_file_path        | text                     |
+| survey_packages | 8                | manifest             | jsonb                    |
+| survey_packages | 9                | status               | USER-DEFINED             |
+| survey_packages | 10               | created_by           | uuid                     |
+| survey_packages | 11               | created_at           | timestamp with time zone |
+| survey_packages | 12               | updated_at           | timestamp with time zone |
+| survey_packages | 13               | published_at         | timestamp with time zone |
 
 ---
 
@@ -151,28 +155,70 @@ SELECT table_name, column_name, data_type, is_nullable FROM information_schema.c
 
 **Query:**
 ```sql
-SELECT tc.table_name, kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public';
+  kcu.table_schema || '.' || kcu.table_name AS foreign_table,
+  kcu.column_name AS fk_column,
+  '->' AS rel,
+  ccu.table_schema || '.' || ccu.table_name AS primary_table,
+  ccu.column_name AS pk_column
+FROM information_schema.key_column_usage kcu
+JOIN information_schema.constraint_column_usage ccu
+  ON kcu.constraint_name = ccu.constraint_name
+  AND kcu.constraint_schema = ccu.constraint_schema
+WHERE kcu.constraint_schema = 'public'
+  AND kcu.ordinal_position IS NOT NULL
+ORDER BY foreign_table, kcu.ordinal_position;
 ```
 
-| table_name | column_name | foreign_table_name | foreign_column_name |
-| :--- | :--- | :--- | :--- |
-| app_sessions | project_id | projects | id |
-| app_sessions | credential_id | app_credentials | id |
-| app_credentials | created_by | profiles | id |
-| app_credentials | project_id | projects | id |
-| submission_history | submission_id | submissions | id |
-| submissions | crf_id | crfs | id |
-| submissions | survey_package_id | survey_packages | id |
-| submissions | project_id | projects | id |
-| crfs | project_id | projects | id |
-| crfs | survey_package_id | survey_packages | id |
-| survey_packages | created_by | profiles | id |
-| survey_packages | project_id | projects | id |
-| project_members | invited_by | profiles | id |
-| project_members | user_id | profiles | id |
-| project_members | project_id | projects | id |
-| projects | created_by | profiles | id |
-
+| foreign_table          | fk_column         | rel | primary_table          | pk_column         |
+| ---------------------- | ----------------- | --- | ---------------------- | ----------------- |
+| public.app_credentials | project_id        | ->  | public.app_credentials | project_id        |
+| public.app_credentials | created_by        | ->  | public.profiles        | id                |
+| public.app_credentials | project_id        | ->  | public.projects        | id                |
+| public.app_credentials | project_id        | ->  | public.app_credentials | username          |
+| public.app_credentials | id                | ->  | public.app_credentials | id                |
+| public.app_credentials | username          | ->  | public.app_credentials | username          |
+| public.app_credentials | username          | ->  | public.app_credentials | project_id        |
+| public.app_sessions    | project_id        | ->  | public.projects        | id                |
+| public.app_sessions    | credential_id     | ->  | public.app_credentials | id                |
+| public.app_sessions    | token             | ->  | public.app_sessions    | token             |
+| public.app_sessions    | id                | ->  | public.app_sessions    | id                |
+| public.crfs            | survey_package_id | ->  | public.crfs            | survey_package_id |
+| public.crfs            | project_id        | ->  | public.projects        | id                |
+| public.crfs            | survey_package_id | ->  | public.survey_packages | id                |
+| public.crfs            | survey_package_id | ->  | public.crfs            | table_name        |
+| public.crfs            | id                | ->  | public.crfs            | id                |
+| public.crfs            | table_name        | ->  | public.crfs            | table_name        |
+| public.crfs            | table_name        | ->  | public.crfs            | survey_package_id |
+| public.formchanges     | project_id        | ->  | public.projects        | id                |
+| public.formchanges     | id                | ->  | public.formchanges     | id                |
+| public.formchanges     | formchanges_uuid  | ->  | public.formchanges     | formchanges_uuid  |
+| public.formchanges     | project_id        | ->  | public.projects        | id                |
+| public.profiles        | id                | ->  | public.profiles        | id                |
+| public.project_members | id                | ->  | public.project_members | id                |
+| public.project_members | project_id        | ->  | public.project_members | project_id        |
+| public.project_members | project_id        | ->  | public.project_members | user_id           |
+| public.project_members | invited_by        | ->  | public.profiles        | id                |
+| public.project_members | project_id        | ->  | public.projects        | id                |
+| public.project_members | user_id           | ->  | public.profiles        | id                |
+| public.project_members | user_id           | ->  | public.project_members | project_id        |
+| public.project_members | user_id           | ->  | public.project_members | user_id           |
+| public.projects        | created_by        | ->  | public.projects        | created_by        |
+| public.projects        | created_by        | ->  | public.profiles        | id                |
+| public.projects        | id                | ->  | public.projects        | id                |
+| public.projects        | created_by        | ->  | public.projects        | slug              |
+| public.projects        | slug              | ->  | public.projects        | slug              |
+| public.projects        | slug              | ->  | public.projects        | created_by        |
+| public.submissions     | project_id        | ->  | public.projects        | id                |
+| public.submissions     | id                | ->  | public.submissions     | id                |
+| public.submissions     | crf_id            | ->  | public.crfs            | id                |
+| public.submissions     | survey_package_id | ->  | public.survey_packages | id                |
+| public.survey_packages | created_by        | ->  | public.profiles        | id                |
+| public.survey_packages | project_id        | ->  | public.survey_packages | project_id        |
+| public.survey_packages | project_id        | ->  | public.survey_packages | name              |
+| public.survey_packages | id                | ->  | public.survey_packages | id                |
+| public.survey_packages | project_id        | ->  | public.projects        | id                |
+| public.survey_packages | name              | ->  | public.survey_packages | project_id        |
+| public.survey_packages | name              | ->  | public.survey_packages | name              |
 ---
 
 ### 3. Row Level Security (RLS) Policies
@@ -205,6 +251,3 @@ SELECT tablename, policyname, roles, cmd, qual, with_check FROM pg_policies WHER
 | projects | Enable insert for authenticated users only | {public} | INSERT | null | ((SELECT auth.role() AS role) = 'authenticated'::text) |
 | projects | Users can view member projects | {public} | SELECT | ((auth.uid() = created_by) OR (EXISTS (SELECT 1 FROM project_members pm WHERE ((pm.project_id = projects.id) AND (pm.user_id = auth.uid()))))) | null |
 
-
-
-[Image of database ER diagram]

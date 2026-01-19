@@ -70,6 +70,7 @@ export interface SkipRule {
   fieldname: string;
   condition: SkipCondition;
   response: string;
+  response_type?: 'fixed' | 'dynamic';
   skipToFieldname: string;
 }
 
@@ -78,6 +79,7 @@ export interface CalculationConfig {
   field?: string;
   value?: string;
   unit?: 'y' | 'm' | 'w' | 'd';
+  separator?: string;
   cases?: Array<{
     field: string;
     operator: string;
@@ -99,7 +101,7 @@ export interface SurveyQuestion {
   dynamicResponses?: DynamicResponseConfig;
   numericCheck?: NumericCheck;
   dateRange?: DateRange;
-  logicCheck?: LogicCheck;
+  logicCheck?: LogicCheck[];
   uniqueCheck?: { message: string };
   preskip?: SkipRule[];
   postskip?: SkipRule[];
@@ -136,6 +138,7 @@ export interface SurveyForm {
   repeatCountSource?: string;
   autoStartRepeat: AutoStartRepeat;
   repeatEnforceCount: RepeatEnforceCount;
+  primaryKey?: string;
   questions: SurveyQuestion[];
 }
 

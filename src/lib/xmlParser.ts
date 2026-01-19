@@ -6,13 +6,14 @@ import {
   ResponseOption, 
   DynamicResponseConfig,
   SkipRule,
-  CalculationConfig
+  CalculationConfig,
+  LogicCheck,
 } from "@/types/survey";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "",
-  parseAttributeValue: true,
+  parseAttributeValue: false, // Fix: Disable auto-parsing to preserve leading zeros (e.g. "096")
 });
 
 export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
@@ -80,8 +81,8 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
     // Handle Numeric Check
     if (q.numeric_check && q.numeric_check.values) {
       question.numericCheck = {
-        minValue: q.numeric_check.values.minvalue,
-        maxValue: q.numeric_check.values.maxvalue,
+        minValue: q.numeric_check.values.minvalue ? Number(q.numeric_check.values.minvalue) : undefined,
+        maxValue: q.numeric_check.values.maxvalue ? Number(q.numeric_check.values.maxvalue) : undefined,
         otherValues: q.numeric_check.values.other_values,
         message: q.numeric_check.values.message
       };
@@ -90,8 +91,8 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
     // Handle Date Range
     if (q.date_range) {
       question.dateRange = {
-        minDate: q.date_range.min_date,
-        maxDate: q.date_range.max_date
+        minDate: q.date_range.min_date !== undefined ? String(q.date_range.min_date) : undefined,
+        maxDate: q.date_range.max_date !== undefined ? String(q.date_range.max_date) : undefined
       };
     }
 
@@ -100,10 +101,8 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
       // Normalize to array to handle multiple checks
       const checks = Array.isArray(q.logic_check) ? q.logic_check : [q.logic_check];
       
-      // Take the first one for now (as type only supports one)
-      // TODO: Update type to support multiple logic checks
-      if (checks.length > 0) {
-        let checkStr = checks[0];
+      question.logicCheck = checks.map((checkItem: any) => {
+        let checkStr = checkItem;
         
         // Handle if it's an object with #text
         if (typeof checkStr === 'object' && checkStr['#text']) {
@@ -112,12 +111,13 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
         
         if (typeof checkStr === 'string') {
           const parts = checkStr.split(';');
-          question.logicCheck = {
+          return {
             condition: parts[0]?.trim() || "",
             message: parts[1]?.trim().replace(/^'|'$/g, "") || ""
           };
         }
-      }
+        return { condition: "", message: "" }; // Fallback
+      }).filter((lc: LogicCheck) => lc.condition !== ""); // Filter out empty ones
     }
 
     // Handle Unique Check
@@ -145,6 +145,7 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
         field: q.calculation.field,
         value: q.calculation.value,
         unit: q.calculation.unit,
+        separator: q.calculation.separator,
       };
 
       if (q.calculation.when) {
@@ -173,5 +174,6 @@ const mapSkipRule = (s: any): SkipRule => ({
   fieldname: s.fieldname,
   condition: s.condition,
   response: String(s.response),
+  response_type: s.response_type,
   skipToFieldname: s.skiptofieldname
 });
