@@ -39,6 +39,7 @@ import QuestionCard from "./QuestionCard";
 import QuestionEditor from "./QuestionEditor";
 import FormManifestEditor from "./FormManifestEditor";
 import XmlPreview from "./XmlPreview";
+import GlobalSettingsEditor from "./GlobalSettingsEditor";
 import { surveyService } from "@/services/surveyService";
 import { useToast } from "@/hooks/use-toast";
 
@@ -85,6 +86,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
   const [showQuestionEditor, setShowQuestionEditor] = useState(false);
   const [showFormSettings, setShowFormSettings] = useState(false);
   const [showXmlPreview, setShowXmlPreview] = useState(false);
+  const [showGlobalSettings, setShowGlobalSettings] = useState(false);
   const [deleteFormId, setDeleteFormId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -244,14 +246,23 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
       {/* Package Header */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <Input
-            value={surveyPackage.name}
-            onChange={(e) => updatePackage({ name: e.target.value })}
-            className="text-lg font-semibold w-64"
-          />
+          <div
+            className="text-lg font-semibold cursor-pointer hover:underline"
+            onClick={() => setShowGlobalSettings(true)}
+          >
+            {surveyPackage.name || 'Untitled Survey'}
+          </div>
           <Badge variant="outline">v{surveyPackage.version}</Badge>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowGlobalSettings(true)}
+            size="sm"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Survey Settings
+          </Button>
           <Button
             variant="ghost"
             onClick={() => handleSaveToProject('draft')}
@@ -448,6 +459,14 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
           onSave={(updatedForm) => updateForm(activeFormId, updatedForm)}
         />
       )}
+
+      {/* Global Settings Sheet */}
+      <GlobalSettingsEditor
+        surveyPackage={surveyPackage}
+        open={showGlobalSettings}
+        onOpenChange={setShowGlobalSettings}
+        onSave={setSurveyPackage}
+      />
 
       {/* XML Preview Dialog */}
       <XmlPreview

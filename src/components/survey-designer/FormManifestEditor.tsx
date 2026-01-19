@@ -107,7 +107,7 @@ const FormManifestEditor = ({ form, allForms, open, onOpenChange, onSave }: Form
                     Matches the XML filename (without extension)
                   </p>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label>Display Name</Label>
                   <Input
@@ -116,7 +116,19 @@ const FormManifestEditor = ({ form, allForms, open, onOpenChange, onSave }: Form
                     placeholder="e.g., Enrollment Form"
                   />
                 </div>
-                
+
+                <div className="space-y-2">
+                  <Label>Primary Key</Label>
+                  <Input
+                    value={editedForm.primaryKey || ''}
+                    onChange={(e) => update('primaryKey', e.target.value)}
+                    placeholder="e.g., hhid, linenum"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated list of fields that make up the primary key
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Display Order</Label>
                   <Input
@@ -125,7 +137,7 @@ const FormManifestEditor = ({ form, allForms, open, onOpenChange, onSave }: Form
                     onChange={(e) => update('displayOrder', parseInt(e.target.value) || 0)}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label>Display Fields (for list view)</Label>
                   <Input
@@ -163,18 +175,44 @@ const FormManifestEditor = ({ form, allForms, open, onOpenChange, onSave }: Form
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 {editedForm.parenttable && (
-                  <div className="space-y-2">
-                    <Label>Linking Field</Label>
-                    <Input
-                      value={editedForm.linkingfield || ''}
-                      onChange={(e) => update('linkingfield', e.target.value || undefined)}
-                      placeholder="e.g., hhid"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Field used to link child records to parent
-                    </p>
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <Label>Linking Field (in child table)</Label>
+                      <Input
+                        value={editedForm.linkingfield || ''}
+                        onChange={(e) => update('linkingfield', e.target.value || undefined)}
+                        placeholder="e.g., hhid"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Field used to link child records to parent
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Increment Field</Label>
+                      <Input
+                        value={editedForm.incrementField || ''}
+                        onChange={(e) => update('incrementField', e.target.value || undefined)}
+                        placeholder="e.g., linenum"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Field that auto-increments for each child record (e.g. line number)
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Entry Condition</Label>
+                      <Input
+                        value={editedForm.entry_condition || ''}
+                        onChange={(e) => update('entry_condition', e.target.value || undefined)}
+                        placeholder="e.g., enrolled=1"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Condition required to enter/start this form
+                      </p>
+                    </div>
                   </div>
                 )}
               </AccordionContent>
@@ -218,7 +256,7 @@ const FormManifestEditor = ({ form, allForms, open, onOpenChange, onSave }: Form
                           Add Field
                         </Button>
                       </div>
-                      
+
                       {editedForm.idconfig.fields.map((field, index) => (
                         <div key={index} className="flex items-center gap-2">
                           <Input

@@ -1,4 +1,3 @@
-// Survey Question Types
 export type QuestionType = 
   | 'text' 
   | 'radio' 
@@ -58,10 +57,11 @@ export interface NumericCheck {
 export interface DateRange {
   minDate?: string;
   maxDate?: string;
+  // Ensure the parser handles "0" as string if needed, string type is correct here
 }
 
 export interface LogicCheck {
-  condition: string;
+  condition: string; // e.g., "age > 18"
   message: string;
 }
 
@@ -95,7 +95,7 @@ export interface SurveyQuestion {
   fieldname: string;
   fieldtype: FieldType;
   text: string;
-  maxCharacters?: number | string;
+  maxCharacters?: number | string; // Can be string in XML if parsed that way
   mask?: string;
   responses?: ResponseOption[];
   dynamicResponses?: DynamicResponseConfig;
@@ -133,26 +133,29 @@ export interface SurveyForm {
   parenttable?: string;
   linkingfield?: string;
   displayFields?: string;
+  
+  // New/Updated fields
   idconfig?: IdConfig;
   repeatCountField?: string;
-  repeatCountSource?: string;
+  repeatCountSource?: string; // UI helper, likely not in manifest
   autoStartRepeat: AutoStartRepeat;
   repeatEnforceCount: RepeatEnforceCount;
+  
   primaryKey?: string;
+  incrementField?: string;
+  entry_condition?: string;
+  
   questions: SurveyQuestion[];
 }
 
-/**
- * Represents the survey configuration for a Project.
- * In the new flattened structure, the 'SurveyPackage' is essentially the Project's protocol.
- */
-export interface ProjectProtocol {
-  id: string; // This is the Project ID
-  name: string; // Project Name
+export interface SurveyPackage {
+  id: string; // Database UUID
+  surveyId: string; // Logical ID (e.g. prism_css_v1), maps to survey_packages.name
+  name: string; // Display Name, maps to survey_packages.display_name
   version: string;
   forms: SurveyForm[];
+  
+  // Global Manifest settings
+  databaseName?: string;
+  xmlFiles?: string[];
 }
-
-// Alias for backward compatibility if needed during refactor, 
-// but code should prefer ProjectProtocol
-export type SurveyPackage = ProjectProtocol;

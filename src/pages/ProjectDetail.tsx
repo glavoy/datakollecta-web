@@ -83,7 +83,6 @@ const ProjectDetail = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadVersionName, setUploadVersionName] = useState("");
 
   useEffect(() => {
     if (slug) {
@@ -312,12 +311,16 @@ const ProjectDetail = () => {
       if (storageError) throw storageError;
 
       // 3. Insert into survey_packages
+      // Extract unique ID from filename
+      const rawFilename = uploadFile.name.replace(/\.zip$/i, "");
+      const surveyId = rawFilename.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+
       const { data: surveyData, error: dbError } = await supabase
         .from('survey_packages')
         .insert({
           project_id: project.id,
-          name: uploadVersionName,
-          display_name: manifest.surveyName || uploadVersionName,
+          name: surveyId, // This is the unique ID
+          display_name: manifest.surveyName || rawFilename,
           version_date: new Date().toISOString(),
           description: manifest.description || "",
           zip_file_path: filePath,
@@ -382,7 +385,6 @@ const ProjectDetail = () => {
 
       setIsUploadOpen(false);
       setUploadFile(null);
-      setUploadVersionName("");
       fetchProjectData();
 
     } catch (error: any) {
@@ -511,24 +513,17 @@ const ProjectDetail = () => {
                     <form onSubmit={handleFileUpload}>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                          <Label htmlFor="versionName">Version Name</Label>
-                          <Input
-                            id="versionName"
-                            placeholder={`e.g., ${project.slug}_v1`}
-                            value={uploadVersionName}
-                            onChange={(e) => setUploadVersionName(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="grid gap-2">
                           <Label htmlFor="file">Survey ZIP File</Label>
                           <Input
                             id="file"
                             type="file"
                             accept=".zip"
                             onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                            required
                           />
+
+                          <p className="text-sm text-muted-foreground">
+                            The zip filename will be used as the unique Survey ID (e.g., prism_css_v1.zip -&gt; prism_css_v1).
+                          </p>
                         </div>
                       </div>
                       <DialogFooter>

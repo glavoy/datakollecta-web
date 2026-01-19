@@ -67,6 +67,7 @@ const SurveyDesignerPage = () => {
           // Create New Survey - Start Fresh
           setInitialPackage({
             id: crypto.randomUUID(),
+            surveyId: '', // Logical ID (e.g. filename base), user should set this
             name: `${projectData.name} Survey`,
             version: '1.0',
             forms: []

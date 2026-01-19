@@ -45,8 +45,8 @@ export const surveyService = {
       .upsert({
         id: pkg.id, // Use existing ID if updating, or new UUID if creating
         project_id: projectId,
-        name: sanitizedName,
-        display_name: surveyDisplayName,
+        name: pkg.surveyId, // Use pkg.surveyId for the name column
+        display_name: pkg.name, // Use pkg.name for the display_name column
         version_date: new Date().toISOString().split('T')[0],
         description: null, // Optional description field
         manifest: JSON.parse(manifestJson),
@@ -110,10 +110,15 @@ export const surveyService = {
     if (crfsError) throw crfsError;
 
     // 3. Construct the SurveyPackage object
-    return {
+    // 3. Construct the SurveyPackage object
+    const manifest = survey.manifest as any; 
+    const pkg: SurveyPackage = {
       id: survey.id,
-      name: survey.display_name, // Use display_name for user-friendly name
-      version: '1.0', // Version is now tracked by version_date
+      surveyId: survey.name, // The logical ID
+      name: survey.display_name, // The display name
+      version: "1.0", // TODO: stored version
+      databaseName: manifest?.databaseName || `${survey.name}.sqlite`,
+      xmlFiles: manifest?.xmlFiles || [],
       forms: (crfs || []).map(crf => ({
         id: crf.id,
         tablename: crf.table_name,
@@ -127,8 +132,11 @@ export const surveyService = {
         autoStartRepeat: crf.auto_start_repeat || 0,
         repeatEnforceCount: crf.repeat_enforce_count || 1,
         primaryKey: crf.primary_key,
+        incrementField: crf.increment_field,
+        entry_condition: crf.entry_condition,
       }))
     };
+    return pkg;
   },
 
   /**

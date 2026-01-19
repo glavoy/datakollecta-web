@@ -197,32 +197,37 @@ export function generateFormXml(form: SurveyForm): string {
   return lines.join('\n');
 }
 
-export function generateManifestGistx(pkg: SurveyPackage): string {
-  const sanitizedId = pkg.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-  
+export const generateManifestGistx = (pkg: SurveyPackage): string => {
   const manifest = {
     surveyName: pkg.name,
-    surveyId: sanitizedId,
-    databaseName: `${sanitizedId}.sqlite`,
+    surveyId: pkg.surveyId,
+    databaseName: pkg.databaseName || `${pkg.surveyId}.sqlite`,
     xmlFiles: pkg.forms.map(f => `${f.tablename}.xml`),
     crfs: pkg.forms.map(form => ({
       display_order: form.displayOrder,
       tablename: form.tablename,
       displayname: form.displayname,
-      isbase: 1, 
-      primarykey: form.primaryKey || "id",
-      linkingfield: form.linkingfield || "subjid",
+      isbase: form.parenttable ? 0 : 1, 
+      primarykey: form.primaryKey || (form.questions.find(q => q.fieldname === "subjid") ? "subjid" : "id"),
+      linkingfield: form.linkingfield,
+      parenttable: form.parenttable,
+      incrementfield: form.incrementField,
+      requireslink: form.parenttable ? 1 : 0,
+      repeat_count_field: form.repeatCountField,
+      auto_start_repeat: form.autoStartRepeat,
+      repeat_enforce_count: form.repeatEnforceCount,
+      display_fields: form.displayFields,
+      entry_condition: form.entry_condition,
       idconfig: form.idconfig ? {
         prefix: form.idconfig.prefix,
         fields: form.idconfig.fields,
         incrementLength: form.idconfig.incrementLength
-      } : null,
-      display_fields: form.displayFields || null
+      } : undefined
     }))
   };
-  
+
   return JSON.stringify(manifest, null, 2);
-}
+};
 
 export function downloadFile(content: string, filename: string, type: string = 'text/xml') {
   const blob = new Blob([content], { type });
