@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import ResponseOptionsEditor from "./ResponseOptionsEditor";
 import SkipLogicEditor from "./SkipLogicEditor";
 import ValidationEditor from "./ValidationEditor";
@@ -34,9 +36,99 @@ interface QuestionEditorProps {
   onSave: (question: SurveyQuestion) => void;
 }
 
+// Helper to determine what configuration options to show based on question type and field type
+const getFieldConfig = (questionType: QuestionType, fieldType: FieldType) => {
+  const isTextInput = questionType === 'text';
+  const isSelectType = ['radio', 'checkbox', 'combobox'].includes(questionType);
+  const isDateType = ['date', 'datetime'].includes(questionType);
+  const isCalculated = questionType === 'calculated';
+  const isInformation = questionType === 'information';
+  const isButton = questionType === 'button';
+  const isNumericField = ['text_integer', 'text_decimal'].includes(fieldType);
+  const needsMaxChars = ['text', 'text_integer', 'text_decimal', 'text_id', 'phone_num', 'hourmin'].includes(fieldType);
+
+  return {
+    // Basic tab options
+    showMaxCharacters: isTextInput && needsMaxChars,
+    showMask: isTextInput,
+    showDontKnowRefuseNa: !isInformation && !isCalculated && !isButton,
+
+    // Responses tab
+    showResponses: isSelectType,
+    showCalculation: isCalculated,
+
+    // Validation tab
+    showNumericCheck: isTextInput && isNumericField,
+    showDateRange: isDateType,
+    showLogicCheck: !isInformation && !isButton,
+    showUniqueCheck: isTextInput,
+
+    // Skip Logic tab
+    showSkipLogic: !isButton,
+
+    // Whether to show field type selector (or auto-set)
+    allowFieldTypeEdit: isTextInput || isCalculated,
+  };
+};
+
+// Get default field type when question type changes
+const getDefaultFieldType = (questionType: QuestionType): FieldType => {
+  switch (questionType) {
+    case 'radio':
+      return 'integer';
+    case 'checkbox':
+      return 'text';
+    case 'date':
+      return 'date';
+    case 'datetime':
+      return 'datetime';
+    case 'information':
+      return 'n/a';
+    case 'calculated':
+      return 'integer';
+    case 'button':
+      return 'n/a';
+    case 'combobox':
+      return 'text';
+    case 'text':
+    default:
+      return 'text';
+  }
+};
+
+// Get available field types for a question type
+const getAvailableFieldTypes = (questionType: QuestionType): { value: FieldType; label: string }[] => {
+  if (questionType === 'text') {
+    return [
+      { value: 'text', label: 'Text' },
+      { value: 'text_integer', label: 'Integer (numeric input)' },
+      { value: 'text_decimal', label: 'Decimal (numeric input)' },
+      { value: 'text_id', label: 'ID/Identifier' },
+      { value: 'phone_num', label: 'Phone Number' },
+      { value: 'hourmin', label: 'Hour:Minute' },
+    ];
+  }
+  if (questionType === 'calculated') {
+    return [
+      { value: 'integer', label: 'Integer' },
+      { value: 'text', label: 'Text' },
+      { value: 'text_integer', label: 'Text Integer' },
+      { value: 'date', label: 'Date' },
+    ];
+  }
+  if (questionType === 'radio' || questionType === 'combobox') {
+    return [
+      { value: 'integer', label: 'Integer' },
+      { value: 'text', label: 'Text' },
+    ];
+  }
+  // For other types, return the default
+  return [{ value: getDefaultFieldType(questionType), label: getDefaultFieldType(questionType) }];
+};
+
 const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: QuestionEditorProps) => {
   // Initialize synchronously from prop to avoid render flash/null issues
-  const [editedQuestion, setEditedQuestion] = useState<SurveyQuestion | null>(() => 
+  const [editedQuestion, setEditedQuestion] = useState<SurveyQuestion | null>(() =>
     question ? JSON.parse(JSON.stringify(question)) : null
   );
 
@@ -49,9 +141,8 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
 
   if (!editedQuestion) return null;
 
-  const showResponses = ['radio', 'checkbox', 'combobox'].includes(editedQuestion.type);
-  const showCalculation = editedQuestion.type === 'automatic';
-  const isReadOnly = editedQuestion.type === 'information';
+  const config = getFieldConfig(editedQuestion.type, editedQuestion.fieldtype);
+  const availableFieldTypes = getAvailableFieldTypes(editedQuestion.type);
 
   const handleSave = () => {
     onSave(editedQuestion);
@@ -62,8 +153,49 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
     setEditedQuestion(prev => prev ? { ...prev, [field]: value } : null);
   };
 
+  // Handle question type change with auto field type setting
+  const handleTypeChange = (newType: QuestionType) => {
+    const newFieldType = getDefaultFieldType(newType);
+    setEditedQuestion(prev => {
+      if (!prev) return null;
+      const updated: SurveyQuestion = {
+        ...prev,
+        type: newType,
+        fieldtype: newFieldType,
+      };
+      // Clear responses if changing away from select types
+      if (!['radio', 'checkbox', 'combobox'].includes(newType)) {
+        updated.responses = undefined;
+        updated.dynamicResponses = undefined;
+      }
+      // Initialize responses array for select types
+      if (['radio', 'checkbox', 'combobox'].includes(newType) && !updated.responses) {
+        updated.responses = [];
+      }
+      // Clear calculation if not calculated type
+      if (newType !== 'calculated') {
+        updated.calculation = undefined;
+      }
+      // Clear validation options that don't apply
+      if (['information', 'button'].includes(newType)) {
+        updated.dontKnow = undefined;
+        updated.refuse = undefined;
+        updated.na = undefined;
+        updated.numericCheck = undefined;
+        updated.dateRange = undefined;
+        updated.logicCheck = undefined;
+        updated.uniqueCheck = undefined;
+      }
+      return updated;
+    });
+  };
+
   // Get questions that appear before this one (for skip logic)
   const previousQuestions = allQuestions.filter(q => q.id !== editedQuestion.id);
+
+  // Determine if we should show the Responses/Calculation tab
+  const showMiddleTab = config.showResponses || config.showCalculation;
+  const middleTabLabel = config.showCalculation ? 'Calculation' : 'Responses';
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -79,11 +211,11 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="basic">Basic</TabsTrigger>
-              <TabsTrigger value="responses" disabled={!showResponses && !showCalculation}>
-                {showCalculation ? 'Calculation' : 'Responses'}
+              <TabsTrigger value="responses" disabled={!showMiddleTab}>
+                {middleTabLabel}
               </TabsTrigger>
               <TabsTrigger value="validation">Validation</TabsTrigger>
-              <TabsTrigger value="logic">Skip Logic</TabsTrigger>
+              <TabsTrigger value="logic" disabled={!config.showSkipLogic}>Skip Logic</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4 mt-4">
@@ -92,7 +224,7 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
                 <Label>Question Type</Label>
                 <Select
                   value={editedQuestion.type}
-                  onValueChange={(v) => update('type', v as QuestionType)}
+                  onValueChange={(v) => handleTypeChange(v as QuestionType)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -105,7 +237,8 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
                     <SelectItem value="date">Date</SelectItem>
                     <SelectItem value="datetime">Date & Time</SelectItem>
                     <SelectItem value="information">Information (Read-only)</SelectItem>
-                    <SelectItem value="automatic">Calculated (Automatic)</SelectItem>
+                    <SelectItem value="calculated">Calculated (Auto-computed)</SelectItem>
+                    <SelectItem value="button">Button (Action)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -119,30 +252,29 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
                   placeholder="e.g., participant_name"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Unique identifier used in logic and database. No spaces allowed.
+                  Unique identifier used in logic and database. Lowercase, no spaces.
                 </p>
               </div>
 
-              {/* Field Type */}
-              <div className="space-y-2">
-                <Label>Data Type</Label>
-                <Select
-                  value={editedQuestion.fieldtype}
-                  onValueChange={(v) => update('fieldtype', v as FieldType)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="text">Text</SelectItem>
-                    <SelectItem value="integer">Integer</SelectItem>
-                    <SelectItem value="text_integer">Text/Integer</SelectItem>
-                    <SelectItem value="date">Date</SelectItem>
-                    <SelectItem value="datetime">DateTime</SelectItem>
-                    <SelectItem value="n/a">N/A (Information only)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Field Type - only show when configurable */}
+              {config.allowFieldTypeEdit && (
+                <div className="space-y-2">
+                  <Label>Data Type</Label>
+                  <Select
+                    value={editedQuestion.fieldtype}
+                    onValueChange={(v) => update('fieldtype', v as FieldType)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableFieldTypes.map(ft => (
+                        <SelectItem key={ft.value} value={ft.value}>{ft.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Question Text */}
               <div className="space-y-2">
@@ -158,64 +290,84 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
                 </p>
               </div>
 
-              {/* Max Characters */}
-              {!isReadOnly && !showCalculation && (
+              {/* Max Characters - only for text types with appropriate field types */}
+              {config.showMaxCharacters && (
                 <div className="space-y-2">
-                  <Label>Max Characters (optional)</Label>
+                  <Label>Max Characters</Label>
                   <Input
                     value={editedQuestion.maxCharacters ?? ''}
                     onChange={(e) => update('maxCharacters', e.target.value || undefined)}
                     placeholder="e.g., 80 or =10 for exact length"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Use = prefix to enforce exact length (e.g., =10 means exactly 10 characters)
+                  </p>
                 </div>
               )}
 
-              {/* Input Mask */}
-              {editedQuestion.type === 'text' && (
+              {/* Input Mask - only for text type */}
+              {config.showMask && (
                 <div className="space-y-2">
                   <Label>Input Mask (optional)</Label>
                   <Input
                     value={editedQuestion.mask ?? ''}
                     onChange={(e) => update('mask', e.target.value || undefined)}
-                    placeholder="e.g., [A-Z][0-9][0-9]-[0-9][0-9][0-9]"
+                    placeholder="e.g., R21-[0-9][0-9][0-9]-[A-Z0-9][A-Z0-9]"
                   />
                   <p className="text-xs text-muted-foreground">
-                    [0-9] = digit, [A-Z] = letter, [A-Z0-9] = alphanumeric
+                    [0-9] = digit, [A-Z] = letter, [A-Z0-9] = alphanumeric. Literals auto-populate.
                   </p>
                 </div>
               )}
 
-              {/* Don't Know / Refuse options */}
-              {showResponses && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Don't Know Value</Label>
-                    <Input
-                      value={editedQuestion.dontKnow ?? ''}
-                      onChange={(e) => update('dontKnow', e.target.value || undefined)}
-                      placeholder="e.g., 99"
-                    />
+              {/* Don't Know / Refuse / NA options - for applicable types */}
+              {config.showDontKnowRefuseNa && (
+                <>
+                  <Separator className="my-4" />
+                  <Label className="text-sm font-medium">Special Response Values</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Add standard response options for respondents who cannot or choose not to answer.
+                  </p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Don't Know</Label>
+                      <Input
+                        value={editedQuestion.dontKnow ?? ''}
+                        onChange={(e) => update('dontKnow', e.target.value || undefined)}
+                        placeholder="-7"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Refuse to Answer</Label>
+                      <Input
+                        value={editedQuestion.refuse ?? ''}
+                        onChange={(e) => update('refuse', e.target.value || undefined)}
+                        placeholder="-8"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Not Applicable</Label>
+                      <Input
+                        value={editedQuestion.na ?? ''}
+                        onChange={(e) => update('na', e.target.value || undefined)}
+                        placeholder="-6"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Refuse Value</Label>
-                    <Input
-                      value={editedQuestion.refuse ?? ''}
-                      onChange={(e) => update('refuse', e.target.value || undefined)}
-                      placeholder="e.g., 88"
-                    />
-                  </div>
-                </div>
+                </>
               )}
             </TabsContent>
 
             <TabsContent value="responses" className="mt-4">
-              {showResponses && (
+              {config.showResponses && (
                 <ResponseOptionsEditor
                   responses={editedQuestion.responses || []}
+                  dynamicResponses={editedQuestion.dynamicResponses}
                   onChange={(responses) => update('responses', responses)}
+                  onDynamicChange={(dynamic) => update('dynamicResponses', dynamic)}
                 />
               )}
-              {showCalculation && (
+              {config.showCalculation && (
                 <CalculationEditor
                   calculation={editedQuestion.calculation}
                   availableFields={previousQuestions}
@@ -226,6 +378,7 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
 
             <TabsContent value="validation" className="mt-4">
               <ValidationEditor
+                questionType={editedQuestion.type}
                 fieldtype={editedQuestion.fieldtype}
                 numericCheck={editedQuestion.numericCheck}
                 dateRange={editedQuestion.dateRange}

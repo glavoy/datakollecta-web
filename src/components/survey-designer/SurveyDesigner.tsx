@@ -29,11 +29,24 @@ import {
   MoreVertical,
   FileSpreadsheet,
   Copy,
-  ArrowUp,
-  ArrowDown,
   CloudUpload,
   Loader2
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import QuestionTypeSelector from "./QuestionTypeSelector";
 import QuestionCard from "./QuestionCard";
 import QuestionEditor from "./QuestionEditor";
@@ -43,11 +56,36 @@ import GlobalSettingsEditor from "./GlobalSettingsEditor";
 import { surveyService } from "@/services/surveyService";
 import { useToast } from "@/hooks/use-toast";
 
+// Get default field type based on question type
+const getDefaultFieldType = (type: QuestionType): SurveyQuestion['fieldtype'] => {
+  switch (type) {
+    case 'radio':
+      return 'integer';
+    case 'checkbox':
+      return 'text';
+    case 'date':
+      return 'date';
+    case 'datetime':
+      return 'datetime';
+    case 'information':
+      return 'n/a';
+    case 'calculated':
+      return 'integer';
+    case 'button':
+      return 'n/a';
+    case 'combobox':
+      return 'text';
+    case 'text':
+    default:
+      return 'text';
+  }
+};
+
 const createDefaultQuestion = (type: QuestionType): SurveyQuestion => ({
   id: crypto.randomUUID(),
   type,
   fieldname: `field_${Date.now()}`,
-  fieldtype: type === 'date' ? 'date' : type === 'datetime' ? 'datetime' : type === 'information' ? 'n/a' : 'text',
+  fieldtype: getDefaultFieldType(type),
   text: '',
   responses: ['radio', 'checkbox', 'combobox'].includes(type) ? [] : undefined,
 });
@@ -74,6 +112,7 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
   const [surveyPackage, setSurveyPackage] = useState<SurveyPackage>(
     initialPackage || {
       id: crypto.randomUUID(),
+      surveyId: `survey_${Date.now()}`,
       name: 'New Survey Package',
       version: '1.0',
       forms: [createDefaultForm()],
@@ -89,6 +128,14 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
   const [showGlobalSettings, setShowGlobalSettings] = useState(false);
   const [deleteFormId, setDeleteFormId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Sync state when initialPackage changes (e.g. after async load)
   useEffect(() => {
@@ -227,17 +274,15 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
     });
   };
 
-  const moveQuestion = (questionId: string, direction: 'up' | 'down') => {
-    if (!activeForm) return;
-    const index = activeForm.questions.findIndex(q => q.id === questionId);
-    if (
-      (direction === 'up' && index === 0) ||
-      (direction === 'down' && index === activeForm.questions.length - 1)
-    ) return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-    const newQuestions = [...activeForm.questions];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]];
+    if (!activeForm || !over || active.id === over.id) return;
+
+    const oldIndex = activeForm.questions.findIndex(q => q.id === active.id);
+    const newIndex = activeForm.questions.findIndex(q => q.id === over.id);
+
+    const newQuestions = arrayMove(activeForm.questions, oldIndex, newIndex);
     updateForm(activeFormId, { questions: newQuestions });
   };
 
@@ -355,30 +400,18 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
             {/* Questions List */}
             <div className="flex-1 w-full overflow-y-auto min-h-0">
               <div className="space-y-3 pr-4 w-full pb-4">
-                {form.questions.map((question, index) => (
-                  <div key={question.id} className="flex items-start gap-2">
-                    <div className="flex flex-col gap-1 pt-4">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => moveQuestion(question.id, 'up')}
-                        disabled={index === 0}
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => moveQuestion(question.id, 'down')}
-                        disabled={index === form.questions.length - 1}
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <div className="flex-1">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={form.questions.map(q => q.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {form.questions.map((question, index) => (
                       <QuestionCard
+                        key={question.id}
                         question={question}
                         index={index}
                         onEdit={() => {
@@ -388,9 +421,9 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
                         onDuplicate={() => handleDuplicateQuestion(question)}
                         onDelete={() => handleDeleteQuestion(question.id)}
                       />
-                    </div>
-                  </div>
-                ))}
+                    ))}
+                  </SortableContext>
+                </DndContext>
 
                 {form.questions.length === 0 && !showAddQuestion && (
                   <Card className="bg-muted/30 border-dashed border-2">

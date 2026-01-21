@@ -8,11 +8,9 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
-import Surveys from "./pages/Surveys";
 import SurveyDesignerPage from "./pages/SurveyDesignerPage";
-import Teams from "./pages/Teams";
 import DataView from "./pages/DataView";
-import SettingsPage from "./pages/SettingsPage";
+import AccountPage from "./pages/AccountPage";
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import ResetPassword from "./pages/ResetPassword";
@@ -56,31 +54,19 @@ const App = () => (
                 <SurveyDesignerPage />
               </ProtectedRoute>
             } />
-            <Route path="/app/surveys" element={
-              <ProtectedRoute>
-                <Surveys />
-              </ProtectedRoute>
-            } />
-            <Route path="/app/surveys/designer" element={
-              <ProtectedRoute>
-                <SurveyDesignerPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/app/teams" element={
-              <ProtectedRoute>
-                <Teams />
-              </ProtectedRoute>
-            } />
             <Route path="/app/data" element={
               <ProtectedRoute>
                 <DataView />
               </ProtectedRoute>
             } />
-            <Route path="/app/settings" element={
+            <Route path="/app/account" element={
               <ProtectedRoute>
-                <SettingsPage />
+                <AccountPage />
               </ProtectedRoute>
             } />
+            {/* Legacy routes - redirect to new locations */}
+            <Route path="/app/settings" element={<Navigate to="/app/account" replace />} />
+            <Route path="/app/teams" element={<Navigate to="/app/projects" replace />} />
 
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

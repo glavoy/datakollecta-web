@@ -2,38 +2,87 @@
 
 ## Table Descriptions
 
-Here is the breakdown of what each table does in your system:
-
 ### 1. Hierarchy & Access
 
-* **profiles**: Website Users. This is YOU (and your colleagues). It stores your name/email extensions.
+* **profiles**: Website Users. It stores usernames and name/email extensions.
+
+| id       | email               | full_name    | role | created_at                    | updated_at                    |
+| -------- | ------------------- | ------------ | ---- | ----------------------------- | ----------------------------- |
+| 51094065 | email@yahoo.com     | Test account | user | 2025-12-31 10:31:21.345614+00 | 2026-01-05 13:05:20.277826+00 |
+| fd93198d | glavoy@email.com    | Geoff        | user | 2026-01-03 02:24:59.79217+00  | 2026-01-05 13:05:20.277826+00 |
+
+
 * **projects**: The main folder. Everything belongs to a project.
+
+| id      | name                      | description | slug       | status | created_by| created_at                   | updated_at                   | is_active |
+| ------- | ------------------------- | ----------- | ---------- | ------ | --------- | ---------------------------- | ---------------------------- | --------- |
+| fc6d35d5| R21 Test Negative - Geoff |             | r21testneg | active | fd93198d  | 2026-01-18 14:49:46.47106+00 | 2026-01-18 14:49:46.47106+00 | true      |
+
 * **project_members**: The Access List. It links a Profile to a Project. If you aren't in this table for Project X, you can't see Project X.
+
+| id       | project_id | user_id  | role  | invited_by | invited_at                   | accepted_at                  |
+| ------------------------------------ | ------------------------------------ | ------------------------------------ | ----- | ---------- | ---------------------------- | ---------------------------- |
+| 91ff2174 | fc6d35d5   | fd93198d | owner | null       | 2026-01-18 14:49:46.47106+00 | 2026-01-18 14:49:46.47106+00 |
 
 ### 2. The Survey Definitions
 * **survey_packages**: The Zip File/Bundle. When you upload a survey design, it creates a row here. It represents "Version 1 of the Malaria Survey".
-* **crfs**: The Forms. If your survey package has 3 parts (Household, Person, Blood Sample), you will have 3 rows here describing the structure of each form.
+
+| id       | project_id | name                            | display_name                    | version_date | description | zip_file_path            | manifest                            | status | created_by   | created_at                    | updated_at                 | published_at |
+| -------- | ---------- | ------------------------------- | ------------------------------- | ------------ | ----------- | ------------------------ | ----------------------------------- | ------ | ------------ | ----------------------------- | -------------------------- | ------------ |
+| 1722a44b | fc6d35d5   | r21_test_negative_data_kollecta | R21 Test Negative Data Kollecta | 2026-01-19   | null        | fc6d35_data_kollecta.zip | {"crfs":[{"isbase":1,"tablename"...}]} | active | fd93198d     | 2026-01-19 11:20:16.297526+00 | 2026-01-19 13:14:03.316+00 | null         |
+
+* **crfs**: The Forms. Each form/crf/questionnaire in the survey package has a row in this table describing the structure of each form.
+
+| id       | survey_package_id | project_id | table_name | display_name   | display_order | is_base | primary_key | linking_field | parent_table | fields                                                  | id_config                                         | display_fields             | auto_start_repeat | repeat_enforce_count | created_at                    |
+| -------- | ----------------- | ---------- | ---------- | -------------- | ------------- | ------- | ----------- | ------------- | ------------ | ------------------------------------------------------- | ------------------------------------------------- | -------------------------- | ----------------- | -------------------- | ----------------------------- |
+| 018899c5 | 1722a44b          | fc6d35d5   | followup   | Follow Up Form | 1             | false   | null        | null          | null         | []                                                      | null                                              | null                       | false             | 1                    | 2026-01-19 11:27:58.09858+00  |
+| cc4f7b37 | 1722a44b          | fc6d35d5   | enrollee   | Enrollee       | 10            | true    | subjid      | subjid        | null         | [{"id":"ef17cc5a","text":"Please enter the 3-digit...}] | {{"prefix": "","fields": [{"name": "device...}]}} | startdate,participantsname | false             | 1                    | 2026-01-19 11:20:16.706397+00 |
+
 
 ### 3. The Field App (Data Collectors)
 * **app_credentials**: Field Worker Accounts. These are the simple login codes (e.g., surveyor1) that data collectors type into the Android app. They are distinct from website users.
+
+| id       | project_id | username | password_hash | description             | is_active | created_by  | created_at                   | last_used_at |
+| -------- | ---------- | -------- | ------------- | ----------------------- | --------- | ----------- | ---------------------------- | ------------ |
+| 7981a46e | fc6d35d5   | r21      | xyz           | R21 Test Negative study | true      | fd93198d    | 2026-01-20 03:47:23.26618+00 | null         |
+
+
 * **app_sessions**: Active Devices. When a phone logs in, it creates a session here.
 
+| id       | credential_id | project_id | token    | device_id  | device_info         | created_at                    | expires_at                | last_activity_at              |
+| -------- | ------------- | ---------- | -------- | ---------- | ------------------- | ----------------------------- | ------------------------- | ----------------------------- |
+| 4434313a | 7981a46e      | fc6d35d5   | 1647c747 | {9C798D94} | Windows: Windows 11 | 2026-01-20 03:50:30.648518+00 | 2026-02-19 03:50:30.61+00 | 2026-01-20 03:50:30.648518+00 |
+
 ### 4. The Data
-* **submissions**: The Answers. Every time a form is completed and synced, it lands here. The actual data (answers) is stored in a JSON column.
-* **submission_history**: The Audit Trail. If you edit a submission on the website, the old version is saved here so you never lose data.
+* **submissions**: The data uploaded from the mobile app. Every time a form is completed and synced, it is stored here. The actual data is stored in JSON format.
+
+| id       | project_id | survey_package_id | crf_id | table_name | record_id | local_unique_id | data                                          | version | parent_table | parent_record_id | device_id       | surveyor_id | app_version        | collected_at                  | submitted_at                  | updated_at                 |
+| -------- | ---------- | ----------------- | ------ | ---------- | --------- | --------------- | --------------------------------------------- | ------- | ------------ | ---------------- | --------------- | ----------- | ------------------ | ----------------------------- | ----------------------------- | -------------------------- |
+| b32939a0 | fc6d35d5   | e4bd2ef3          | null   | enrollee   | null      | de6523f4        | {"age":"0","dob":"2025-09-20","mrc":"096"...} | 1       | null         | null             | {9C798D94BB5A0} | geoff       | DataKollecta 0.1.0 | 2026-01-20 06:57:17.230018+00 | 2026-01-20 03:57:23.031597+00 | 2026-01-20 03:57:22.987+00 |
+
+
+* **formchanges**: The Audit Trail. If you edit a submission on the website, the old version is saved here so you never lose data.
+
+| id       | formchanges_uuid | project_id | record_uuid | tablename | fieldname | oldvalue                   | newvalue                   | surveyor_id | changed_at                    | synced_at                  |
+| -------- | ---------------- | ---------- | ----------- | --------- | --------- | -------------------------- | -------------------------- | ----------- | ----------------------------- | -------------------------- |
+| e0aa9175 | 3f3dffa9         | fc6d35d5   | de6523f4    | enrollee  | lastmod   | 2026-01-20T06:57:17.230018 | 2026-01-20T07:06:47.717484 | 99          | 2026-01-20 07:06:47.755596+00 | 2026-01-20 04:06:58.491+00 |
+| 49b6d0dc | c50add7d         | fc6d35d5   | de6523f4    | enrollee  | synced_at | 2026-01-20T06:57:23.237906 | null                       | 99          | 2026-01-20 07:06:47.774342+00 | 2026-01-20 04:06:58.566+00 |
+| a5ce3ef8 | 0aa2fe94         | fc6d35d5   | de6523f4    | enrollee  | comments  | null                       | SDS                        | 99          | 2026-01-20 07:06:47.783091+00 | 2026-01-20 04:06:58.608+00 |
 
 ---
 
+#### Database schema
+![Database schema](images/database_structure2.png)
 
 ### General flow
-- create new login
+- create new login - user added to the `profiles` table
 - create a new project
     - after creating a new project, there are records in two tables: `projects`, `project_members`
 - in the new project - upload a 'survey' zip file
     - this creates records in the tables: `survey_packages`, `crfs`
 - create a 'team member' - under add credentials ion teh team member tab - this creats a record in the table: `app_credentials`
 - team member enters credentials on the phone and checks for surveys - writes record to the `app_sessions` table
-- fgg
+- user uploads data - data saved to the `submissions` table and if there are changes, they are saved to the `formchnages` table
 
 
 
@@ -251,3 +300,149 @@ SELECT tablename, policyname, roles, cmd, qual, with_check FROM pg_policies WHER
 | projects | Enable insert for authenticated users only | {public} | INSERT | null | ((SELECT auth.role() AS role) = 'authenticated'::text) |
 | projects | Users can view member projects | {public} | SELECT | ((auth.uid() = created_by) OR (EXISTS (SELECT 1 FROM project_members pm WHERE ((pm.project_id = projects.id) AND (pm.user_id = auth.uid()))))) | null |
 
+
+```
+CREATE TABLE public.app_credentials (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id uuid NOT NULL,
+  username text NOT NULL,
+  password_hash text NOT NULL,
+  description text,
+  is_active boolean DEFAULT true,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  last_used_at timestamp with time zone,
+  CONSTRAINT app_credentials_pkey PRIMARY KEY (id),
+  CONSTRAINT app_credentials_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id),
+  CONSTRAINT app_credentials_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.app_sessions (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  credential_id uuid,
+  project_id uuid,
+  token text NOT NULL UNIQUE,
+  device_id text,
+  device_info jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone NOT NULL,
+  last_activity_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT app_sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT app_sessions_credential_id_fkey FOREIGN KEY (credential_id) REFERENCES public.app_credentials(id),
+  CONSTRAINT app_sessions_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id)
+);
+CREATE TABLE public.crfs (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  survey_package_id uuid NOT NULL,
+  project_id uuid NOT NULL,
+  table_name text NOT NULL,
+  display_name text NOT NULL,
+  display_order integer DEFAULT 0,
+  is_base boolean DEFAULT false,
+  primary_key text,
+  linking_field text,
+  parent_table text,
+  fields jsonb,
+  id_config jsonb,
+  display_fields text,
+  auto_start_repeat boolean DEFAULT false,
+  repeat_enforce_count integer,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT crfs_pkey PRIMARY KEY (id),
+  CONSTRAINT crfs_survey_package_id_fkey FOREIGN KEY (survey_package_id) REFERENCES public.survey_packages(id),
+  CONSTRAINT crfs_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id)
+);
+CREATE TABLE public.formchanges (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  formchanges_uuid text NOT NULL UNIQUE,
+  project_id uuid NOT NULL,
+  record_uuid text NOT NULL,
+  tablename text NOT NULL,
+  fieldname text NOT NULL,
+  oldvalue text,
+  newvalue text,
+  surveyor_id text,
+  changed_at timestamp with time zone,
+  synced_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT formchanges_pkey PRIMARY KEY (id),
+  CONSTRAINT formchanges_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id),
+  CONSTRAINT fk_project FOREIGN KEY (project_id) REFERENCES public.projects(id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  email text NOT NULL,
+  full_name text,
+  role text DEFAULT 'user'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.project_members (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id uuid,
+  user_id uuid,
+  role USER-DEFINED NOT NULL DEFAULT 'viewer'::project_role,
+  invited_by uuid,
+  invited_at timestamp with time zone DEFAULT now(),
+  accepted_at timestamp with time zone,
+  CONSTRAINT project_members_pkey PRIMARY KEY (id),
+  CONSTRAINT project_members_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id),
+  CONSTRAINT project_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT project_members_invited_by_fkey FOREIGN KEY (invited_by) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.projects (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  description text,
+  slug text NOT NULL,
+  status text DEFAULT 'active'::text,
+  created_by uuid DEFAULT auth.uid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  is_active boolean DEFAULT true,
+  CONSTRAINT projects_pkey PRIMARY KEY (id),
+  CONSTRAINT projects_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.submissions (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id uuid NOT NULL,
+  survey_package_id uuid NOT NULL,
+  crf_id uuid,
+  table_name text NOT NULL,
+  record_id text,
+  local_unique_id text NOT NULL,
+  data jsonb NOT NULL,
+  version integer DEFAULT 1,
+  parent_table text,
+  parent_record_id text,
+  device_id text,
+  surveyor_id text,
+  app_version text,
+  collected_at timestamp with time zone,
+  submitted_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT submissions_pkey PRIMARY KEY (id),
+  CONSTRAINT submissions_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id),
+  CONSTRAINT submissions_survey_package_id_fkey FOREIGN KEY (survey_package_id) REFERENCES public.survey_packages(id),
+  CONSTRAINT submissions_crf_id_fkey FOREIGN KEY (crf_id) REFERENCES public.crfs(id)
+);
+CREATE TABLE public.survey_packages (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id uuid,
+  name text NOT NULL,
+  display_name text NOT NULL,
+  version_date date NOT NULL,
+  description text,
+  zip_file_path text,
+  manifest jsonb,
+  status USER-DEFINED DEFAULT 'draft'::survey_status,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  published_at timestamp with time zone,
+  CONSTRAINT survey_packages_pkey PRIMARY KEY (id),
+  CONSTRAINT survey_packages_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id),
+  CONSTRAINT survey_packages_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
+);
+
+```

@@ -1,5 +1,8 @@
 # To Do
 
+
+
+
 - Force all users to use MFA
 - ensure the invited_by column in the project_members table gets populated when adding someone to a project
 - 'Teams' actually refers to field data collectors - change wording on the website - and maybe just set up one set of credentials per project - maybe a unique user for each interviewer/surveyor
@@ -10,6 +13,7 @@
 - on the login page, add option of viewing the password
 - when createing a form, don't allow 'keywords' - formerly automatic variables - starttime, etc.
 - 'View history' not working properly - should only show changed records from current record - uuid == uuid
+- On  the 'Field Teams' tab, when you click 'Revoke Access' for a user, it removes them immediately - need to have a confirmation dialog box
 
 
 ## To delete a user

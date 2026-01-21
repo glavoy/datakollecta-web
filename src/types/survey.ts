@@ -1,31 +1,39 @@
-export type QuestionType = 
-  | 'text' 
-  | 'radio' 
-  | 'checkbox' 
-  | 'combobox' 
-  | 'date' 
-  | 'datetime' 
-  | 'information' 
-  | 'automatic';
+export type QuestionType =
+  | 'text'
+  | 'radio'
+  | 'checkbox'
+  | 'combobox'
+  | 'date'
+  | 'datetime'
+  | 'information'
+  | 'calculated'
+  | 'button';
 
-export type FieldType = 
-  | 'text' 
-  | 'integer' 
-  | 'text_integer' 
-  | 'date' 
-  | 'datetime' 
+export type FieldType =
+  | 'text'
+  | 'integer'
+  | 'text_integer'
+  | 'text_decimal'
+  | 'text_id'
+  | 'phone_num'
+  | 'hourmin'
+  | 'date'
+  | 'datetime'
   | 'n/a';
 
-export type SkipCondition = '=' | '<>' | '<' | '>';
+export type SkipCondition = '=' | '<>' | '<' | '>' | '>=' | '<=' | 'contains' | 'does not contain';
 
-export type CalculationType = 
-  | 'age_from_date' 
-  | 'age_at_date' 
-  | 'date_diff' 
-  | 'case' 
-  | 'concat' 
-  | 'math' 
-  | 'constant';
+export type CalculationType =
+  | 'age_from_date'
+  | 'age_at_date'
+  | 'date_diff'
+  | 'date_offset'
+  | 'case'
+  | 'concat'
+  | 'math'
+  | 'constant'
+  | 'lookup'
+  | 'query';
 
 export interface ResponseOption {
   id: string;
@@ -45,6 +53,9 @@ export interface DynamicResponseConfig {
     value: string;
   }>;
   distinct?: boolean;
+  emptyMessage?: string;
+  dontKnow?: { value: string; label: string };
+  notInList?: { value: string; label: string };
 }
 
 export interface NumericCheck {
@@ -87,6 +98,9 @@ export interface CalculationConfig {
     result: string;
   }>;
   elseResult?: string;
+  // For query type
+  sql?: string;
+  params?: Array<{ name: string; field: string }>;
 }
 
 export interface SurveyQuestion {
@@ -108,6 +122,7 @@ export interface SurveyQuestion {
   calculation?: CalculationConfig;
   dontKnow?: string;
   refuse?: string;
+  na?: string;
 }
 
 // Manifest (CRFS) Types

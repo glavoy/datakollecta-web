@@ -14,10 +14,13 @@ function escapeXml(text: string | number | undefined | null): string {
 
 function generateQuestionXml(question: SurveyQuestion, indent: string = '    '): string {
   const lines: string[] = [];
-  
+
+  // Map 'calculated' to 'automatic' for XML backward compatibility
+  const xmlType = question.type === 'calculated' ? 'automatic' : question.type;
+
   // 0. Opening tag with attributes
-  lines.push(`${indent}<question type='${question.type}' fieldname='${question.fieldname}' fieldtype='${question.fieldtype}'>`);
-  
+  lines.push(`${indent}<question type='${xmlType}' fieldname='${question.fieldname}' fieldtype='${question.fieldtype}'>`);
+
   // 1. Text
   if (question.text) {
     lines.push(`${indent}    <text>${escapeXml(question.text)}</text>`);
@@ -166,11 +169,15 @@ function generateQuestionXml(question: SurveyQuestion, indent: string = '    '):
   if (question.dontKnow) {
     lines.push(`${indent}    <dont_know>${question.dontKnow}</dont_know>`);
   }
-  
+
   if (question.refuse) {
     lines.push(`${indent}    <refuse>${question.refuse}</refuse>`);
   }
-  
+
+  if (question.na) {
+    lines.push(`${indent}    <na>${question.na}</na>`);
+  }
+
   // 11. Closing tag
   lines.push(`${indent}</question>`);
   

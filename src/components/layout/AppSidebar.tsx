@@ -1,9 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
     FolderKanban,
-    Users,
     Database as DatabaseIcon,
-    Settings,
+    User,
     LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,9 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const navigation = [
     { name: "Projects", href: "/app/projects", icon: FolderKanban },
-    { name: "Field Teams", href: "/app/teams", icon: Users },
-    { name: "Submissions", href: "/app/data", icon: DatabaseIcon },
-    { name: "Settings", href: "/app/settings", icon: Settings },
+    { name: "Data", href: "/app/data", icon: DatabaseIcon },
+    { name: "My Account", href: "/app/account", icon: User },
 ];
 
 const AppSidebar = () => {
@@ -43,7 +41,7 @@ const AppSidebar = () => {
                             key={item.name}
                             to={item.href}
                             className={cn(
-                                "flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors",
+                                "flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-md transition-colors",
                                 isActive
                                     ? "bg-secondary text-secondary-foreground"
                                     : "text-muted-foreground hover:bg-accent hover:text-foreground"

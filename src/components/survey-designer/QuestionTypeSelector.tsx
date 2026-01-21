@@ -1,14 +1,15 @@
 import { QuestionType } from "@/types/survey";
 import { Button } from "@/components/ui/button";
-import { 
-  Type, 
-  Circle, 
-  CheckSquare, 
-  ChevronDown, 
-  Calendar, 
-  Clock, 
-  Info, 
-  Calculator 
+import {
+  Type,
+  Circle,
+  CheckSquare,
+  ChevronDown,
+  Calendar,
+  Clock,
+  Info,
+  Calculator,
+  MousePointerClick
 } from "lucide-react";
 
 interface QuestionTypeSelectorProps {
@@ -23,7 +24,8 @@ const questionTypes: { type: QuestionType; label: string; icon: React.ReactNode;
   { type: 'date', label: 'Date', icon: <Calendar className="h-5 w-5" />, description: 'Date picker' },
   { type: 'datetime', label: 'Date & Time', icon: <Clock className="h-5 w-5" />, description: 'Date and time picker' },
   { type: 'information', label: 'Information', icon: <Info className="h-5 w-5" />, description: 'Read-only display text' },
-  { type: 'automatic', label: 'Calculated', icon: <Calculator className="h-5 w-5" />, description: 'Auto-computed value' },
+  { type: 'calculated', label: 'Calculated', icon: <Calculator className="h-5 w-5" />, description: 'Auto-computed value' },
+  { type: 'button', label: 'Button', icon: <MousePointerClick className="h-5 w-5" />, description: 'Action button trigger' },
 ];
 
 const QuestionTypeSelector = ({ onSelect }: QuestionTypeSelectorProps) => {
