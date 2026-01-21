@@ -63,9 +63,10 @@ interface ProjectMembersProps {
   projectId: string;
   projectName: string;
   userRole: string | null;
+  onMemberChange?: () => void;
 }
 
-const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProps) => {
+const ProjectMembers = ({ projectId, projectName, userRole, onMemberChange }: ProjectMembersProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -74,11 +75,11 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
   const [searchEmail, setSearchEmail] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
-  const [selectedRole, setSelectedRole] = useState<'editor' | 'viewer'>('viewer');
+  const [selectedRole, setSelectedRole] = useState<'owner' | 'editor' | 'viewer'>('viewer');
   const [searching, setSearching] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<ProjectMember | null>(null);
   const [memberToEdit, setMemberToEdit] = useState<ProjectMember | null>(null);
-  const [editRole, setEditRole] = useState<'editor' | 'viewer'>('viewer');
+  const [editRole, setEditRole] = useState<'owner' | 'editor' | 'viewer'>('viewer');
 
   const isOwner = userRole === 'owner';
 
@@ -95,12 +96,18 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
       await projectMemberService.addMember(projectId, selectedUser.id, selectedRole, user.id);
     },
     onSuccess: () => {
+      // Invalidate both members list and any project stats that include member counts
       queryClient.invalidateQueries({ queryKey: ['projectMembers', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['userProjects'] }); // For Projects page
       toast({ title: "Member added", description: "User has been added to the project." });
       setIsAddDialogOpen(false);
       setSelectedUser(null);
       setSearchEmail("");
       setSearchResults([]);
+      // Trigger a refetch of project data if available
+      if (onMemberChange) {
+        onMemberChange();
+      }
     },
     onError: (error: any) => {
       toast({
@@ -138,9 +145,15 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
       await projectMemberService.removeMember(memberToRemove.id);
     },
     onSuccess: () => {
+      // Invalidate both members list and any project stats that include member counts
       queryClient.invalidateQueries({ queryKey: ['projectMembers', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['userProjects'] }); // For Projects page
       toast({ title: "Member removed", description: "User has been removed from the project." });
       setMemberToRemove(null);
+      // Trigger a refetch of project data if available
+      if (onMemberChange) {
+        onMemberChange();
+      }
     },
     onError: (error: any) => {
       toast({
@@ -162,8 +175,11 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
       setSearching(true);
       try {
         const results = await projectMemberService.searchUsersByEmail(searchEmail);
-        // Filter out users who are already members
+        // Filter out users who are already members and the current user
         const existingIds = new Set(members?.map(m => m.user_id) || []);
+        if (user?.id) {
+          existingIds.add(user.id); // Exclude current user
+        }
         const filtered = results.filter(u => !existingIds.has(u.id));
         setSearchResults(filtered);
       } catch (error) {
@@ -174,7 +190,7 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timer);
-  }, [searchEmail, members]);
+  }, [searchEmail, members, user]);
 
   const handleSearch = async () => {
     if (searchEmail.length < 2) {
@@ -189,8 +205,11 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
     setSearching(true);
     try {
       const results = await projectMemberService.searchUsersByEmail(searchEmail);
-      // Filter out users who are already members
+      // Filter out users who are already members and the current user
       const existingIds = new Set(members?.map(m => m.user_id) || []);
+      if (user?.id) {
+        existingIds.add(user.id); // Exclude current user
+      }
       const filtered = results.filter(u => !existingIds.has(u.id));
       setSearchResults(filtered);
       if (filtered.length === 0) {
@@ -311,7 +330,7 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
                   </TableCell>
                   {isOwner && (
                     <TableCell>
-                      {member.role !== 'owner' && member.user_id !== user?.id && (
+                      {member.user_id !== user?.id && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -321,7 +340,7 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => {
                               setMemberToEdit(member);
-                              setEditRole(member.role as 'editor' | 'viewer');
+                              setEditRole(member.role as 'owner' | 'editor' | 'viewer');
                             }}>
                               Change Role
                             </DropdownMenuItem>
@@ -406,15 +425,21 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
                 </div>
 
                 <Label>Role</Label>
-                <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as 'editor' | 'viewer')}>
+                <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as 'owner' | 'editor' | 'viewer')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="owner">Owner - Full control including project settings and deletion</SelectItem>
                     <SelectItem value="editor">Editor - Can edit surveys and manage field team</SelectItem>
                     <SelectItem value="viewer">Viewer - Read-only access to data</SelectItem>
                   </SelectContent>
                 </Select>
+                {selectedRole === 'owner' && (
+                  <p className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded p-2">
+                    ⚠️ Owners have full control including the ability to delete the project and manage all members.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -444,17 +469,25 @@ const ProjectMembers = ({ projectId, projectName, userRole }: ProjectMembersProp
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
-            <Label>New Role</Label>
-            <Select value={editRole} onValueChange={(v) => setEditRole(v as 'editor' | 'viewer')}>
-              <SelectTrigger className="mt-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="editor">Editor</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="py-4 space-y-3">
+            <div>
+              <Label>New Role</Label>
+              <Select value={editRole} onValueChange={(v) => setEditRole(v as 'owner' | 'editor' | 'viewer')}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner - Full control</SelectItem>
+                  <SelectItem value="editor">Editor - Can edit surveys and manage field team</SelectItem>
+                  <SelectItem value="viewer">Viewer - Read-only access</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editRole === 'owner' && (
+              <p className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded p-2">
+                ⚠️ This will give the member full control including the ability to delete the project.
+              </p>
+            )}
           </div>
 
           <DialogFooter>

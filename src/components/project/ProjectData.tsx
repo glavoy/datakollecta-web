@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -10,13 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -32,21 +26,28 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Package
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
+import JSZip from "jszip";
 
-interface CRF {
+interface FormWithCount {
   id: string;
   table_name: string;
   display_name: string;
   fields: any[];
-  survey_package_id: string;
-  survey_packages: {
-    display_name: string;
-  };
+  recordCount: number;
+}
+
+interface SurveyWithForms {
+  id: string;
+  name: string;
+  display_name: string;
+  forms: FormWithCount[];
+  totalRecords: number;
 }
 
 interface Submission {
@@ -64,38 +65,69 @@ interface ProjectDataProps {
 }
 
 const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
-  const [selectedFormId, setSelectedFormId] = useState<string>("");
+  const [selectedForm, setSelectedForm] = useState<FormWithCount | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRecord, setSelectedRecord] = useState<Submission | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const pageSize = 25;
 
-  // Fetch all forms (CRFs) for this project
-  const { data: forms, isLoading: formsLoading } = useQuery({
-    queryKey: ['projectForms', projectId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('crfs')
-        .select(`
-          id,
-          table_name,
-          display_name,
-          fields,
-          survey_package_id,
-          survey_packages (
-            display_name
-          )
-        `)
+  // Fetch surveys with their forms and record counts
+  const { data: surveysWithForms, isLoading: surveysLoading } = useQuery({
+    queryKey: ['surveysWithForms', projectId],
+    queryFn: async (): Promise<SurveyWithForms[]> => {
+      // 1. Get all surveys for the project
+      const { data: surveys, error: surveysError } = await supabase
+        .from('survey_packages')
+        .select('id, name, display_name')
         .eq('project_id', projectId)
-        .order('display_order', { ascending: true });
+        .order('version_date', { ascending: false });
 
-      if (error) throw error;
-      return data as unknown as CRF[];
+      if (surveysError) throw surveysError;
+      if (!surveys) return [];
+
+      // 2. For each survey, get its forms with record counts
+      const surveysWithData = await Promise.all(
+        surveys.map(async (survey) => {
+          // Get forms for this survey
+          const { data: forms } = await supabase
+            .from('crfs')
+            .select('id, table_name, display_name, fields')
+            .eq('survey_package_id', survey.id)
+            .order('display_order');
+
+          if (!forms) {
+            return {
+              ...survey,
+              forms: [],
+              totalRecords: 0
+            };
+          }
+
+          // Get record count for each form
+          const formsWithCounts = await Promise.all(
+            forms.map(async (form) => {
+              const { count } = await supabase
+                .from('submissions')
+                .select('*', { count: 'exact', head: true })
+                .eq('project_id', projectId)
+                .eq('table_name', form.table_name);
+
+              return { ...form, recordCount: count || 0 };
+            })
+          );
+
+          return {
+            ...survey,
+            forms: formsWithCounts,
+            totalRecords: formsWithCounts.reduce((sum, f) => sum + f.recordCount, 0)
+          };
+        })
+      );
+
+      return surveysWithData;
     },
   });
-
-  // Get the selected form
-  const selectedForm = forms?.find(f => f.id === selectedFormId);
 
   // Fetch submissions for the selected form
   const { data: submissions, isLoading: submissionsLoading } = useQuery({
@@ -121,15 +153,12 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
       return [];
     }
 
-    // Filter to only show relevant fields (exclude calculated, information, etc. unless they have data)
     const visibleFields = selectedForm.fields.filter((field: any) => {
       const type = field.type?.toLowerCase();
-      // Skip purely informational fields
       if (type === 'information' || type === 'button') return false;
       return true;
     });
 
-    // Take first 6 fields for table display
     return visibleFields.slice(0, 6).map((field: any) => ({
       key: field.fieldname || field.id,
       label: field.text?.substring(0, 50) || field.fieldname || 'Unknown',
@@ -144,11 +173,8 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
 
     const term = searchTerm.toLowerCase();
     return submissions.filter(sub => {
-      // Search in local_unique_id
       if (sub.local_unique_id?.toLowerCase().includes(term)) return true;
-      // Search in surveyor
       if (sub.surveyor_id?.toLowerCase().includes(term)) return true;
-      // Search in data values
       if (sub.data) {
         return Object.values(sub.data).some(val =>
           String(val).toLowerCase().includes(term)
@@ -165,13 +191,13 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
     currentPage * pageSize
   );
 
-  // Export to CSV
-  const handleExportCSV = () => {
-    if (!filteredSubmissions || filteredSubmissions.length === 0 || !selectedForm) return;
+  // CSV generation helper
+  const generateCSV = (submissions: any[]): string => {
+    if (!submissions || submissions.length === 0) return '';
 
-    // Get all unique field names from all submissions
+    // Get all unique field names
     const allFieldNames = new Set<string>();
-    filteredSubmissions.forEach(sub => {
+    submissions.forEach(sub => {
       if (sub.data) {
         Object.keys(sub.data).forEach(key => allFieldNames.add(key));
       }
@@ -180,8 +206,8 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
     // Create header row
     const headers = ['local_unique_id', 'surveyor_id', 'collected_at', 'submitted_at', ...Array.from(allFieldNames)];
 
-    // Create data rows
-    const rows = filteredSubmissions.map(sub => {
+    // Create data rows with proper CSV escaping
+    const rows = submissions.map(sub => {
       const row: string[] = [
         sub.local_unique_id || '',
         sub.surveyor_id || '',
@@ -191,16 +217,48 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
       allFieldNames.forEach(fieldName => {
         const value = sub.data?.[fieldName];
         const stringValue = value === null || value === undefined ? '' : String(value);
-        // Escape quotes and wrap in quotes if contains comma, quote, or newline
         const escaped = stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')
           ? `"${stringValue.replace(/"/g, '""')}"`
           : stringValue;
         row.push(escaped);
       });
       return row.join(',');
-    });
+    }).join('\n');
 
-    const csvContent = [headers.join(','), ...rows].join('\n');
+    return `${headers.join(',')}\n${rows}`;
+  };
+
+  const generateFormChangesCSV = (formchanges: any[]): string => {
+    if (!formchanges || formchanges.length === 0) return '';
+
+    const headers = ['formchanges_uuid', 'record_uuid', 'tablename', 'fieldname', 'oldvalue', 'newvalue', 'surveyor_id', 'changed_at'];
+
+    const rows = formchanges.map(fc => {
+      return [
+        fc.formchanges_uuid || '',
+        fc.record_uuid || '',
+        fc.tablename || '',
+        fc.fieldname || '',
+        fc.oldvalue || '',
+        fc.newvalue || '',
+        fc.surveyor_id || '',
+        fc.changed_at || ''
+      ].map(val => {
+        const str = String(val);
+        return str.includes(',') || str.includes('"') || str.includes('\n')
+          ? `"${str.replace(/"/g, '""')}"`
+          : str;
+      }).join(',');
+    }).join('\n');
+
+    return `${headers.join(',')}\n${rows}`;
+  };
+
+  // Export single form to CSV
+  const handleExportSingleForm = () => {
+    if (!filteredSubmissions || filteredSubmissions.length === 0 || !selectedForm) return;
+
+    const csvContent = generateCSV(filteredSubmissions);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -212,7 +270,80 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
     URL.revokeObjectURL(url);
   };
 
-  // Get field value for display (truncated)
+  // Export all forms for a survey to ZIP
+  const handleExportSurvey = async (surveyId: string) => {
+    const survey = surveysWithForms?.find(s => s.id === surveyId);
+    if (!survey) return;
+
+    setExportingId(surveyId);
+
+    try {
+      const zip = new JSZip();
+
+      // Export each form to CSV and add to ZIP
+      for (const form of survey.forms) {
+        // Fetch submissions for this form
+        const { data: formSubmissions } = await supabase
+          .from('submissions')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('table_name', form.table_name);
+
+        if (formSubmissions && formSubmissions.length > 0) {
+          const csvContent = generateCSV(formSubmissions);
+          zip.file(`${form.table_name}.csv`, csvContent);
+        }
+      }
+
+      // Export formchanges for this survey
+      // Get all local_unique_ids for this survey's submissions
+      const { data: surveySubmissions } = await supabase
+        .from('submissions')
+        .select('local_unique_id')
+        .eq('survey_package_id', surveyId);
+
+      if (surveySubmissions && surveySubmissions.length > 0) {
+        const recordUuids = surveySubmissions.map(s => s.local_unique_id);
+
+        // Fetch formchanges for these records
+        const { data: formchanges } = await supabase
+          .from('formchanges')
+          .select('*')
+          .in('record_uuid', recordUuids);
+
+        if (formchanges && formchanges.length > 0) {
+          const csvContent = generateFormChangesCSV(formchanges);
+          zip.file('formchanges.csv', csvContent);
+        }
+      }
+
+      // Generate and download ZIP
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${survey.name}_data_${format(new Date(), 'yyyy-MM-dd')}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export error:', error);
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+  const handleSelectForm = (form: FormWithCount) => {
+    setSelectedForm(form);
+    setCurrentPage(1);
+    setSearchTerm("");
+    // Scroll to data table section
+    setTimeout(() => {
+      document.getElementById('data-table-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
   const getFieldValue = (data: Record<string, any>, fieldname: string) => {
     const value = data?.[fieldname];
     if (value === null || value === undefined) return '-';
@@ -223,72 +354,116 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Data</h2>
-          <p className="text-sm text-muted-foreground">
-            View and export collected data for this project
-          </p>
-        </div>
-        <Button onClick={handleExportCSV} disabled={!filteredSubmissions?.length}>
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
+      <div>
+        <h2 className="text-xl font-semibold">Data</h2>
+        <p className="text-sm text-muted-foreground">
+          View and export collected data for this project
+        </p>
       </div>
 
-      {/* Form Selector */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Select Form</CardTitle>
-          <CardDescription>Choose a form to view its collected data</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {formsLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading forms...
-            </div>
-          ) : forms && forms.length > 0 ? (
-            <Select value={selectedFormId} onValueChange={(v) => { setSelectedFormId(v); setCurrentPage(1); }}>
-              <SelectTrigger className="w-full md:w-[400px]">
-                <SelectValue placeholder="Select a form..." />
-              </SelectTrigger>
-              <SelectContent>
-                {forms.map((form) => (
-                  <SelectItem key={form.id} value={form.id}>
-                    <div className="flex flex-col">
-                      <span>{form.display_name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {form.survey_packages?.display_name} • {form.table_name}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="text-center py-8">
-              <FileSpreadsheet className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No forms found. Upload or create a survey first.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Survey Cards */}
+      {surveysLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : surveysWithForms && surveysWithForms.length > 0 ? (
+        <div className="space-y-4">
+          {surveysWithForms.map((survey) => (
+            <Card key={survey.id}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      {survey.display_name}
+                    </CardTitle>
+                    <CardDescription>
+                      {survey.forms.length} form{survey.forms.length !== 1 ? 's' : ''} • {survey.totalRecords} total record{survey.totalRecords !== 1 ? 's' : ''}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleExportSurvey(survey.id)}
+                    disabled={survey.totalRecords === 0 || exportingId === survey.id}
+                  >
+                    {exportingId === survey.id ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Export All
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {survey.forms.length > 0 ? (
+                  <div className="space-y-2">
+                    {survey.forms.map((form) => (
+                      <div
+                        key={form.id}
+                        className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                          selectedForm?.id === form.id
+                            ? 'bg-accent border-primary'
+                            : 'hover:bg-accent cursor-pointer'
+                        }`}
+                        onClick={() => handleSelectForm(form)}
+                      >
+                        <div>
+                          <p className="font-medium">{form.display_name}</p>
+                          <p className="text-sm text-muted-foreground">{form.table_name}</p>
+                        </div>
+                        <Badge variant={form.recordCount > 0 ? 'secondary' : 'outline'}>
+                          {form.recordCount} record{form.recordCount !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-4">No forms in this survey</p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">No surveys found. Upload or create a survey first.</p>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Data Table */}
+      {/* Data Table Section */}
       {selectedForm && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>{selectedForm.display_name}</CardTitle>
-                <CardDescription>
-                  {submissionsLoading
-                    ? "Loading..."
-                    : `${filteredSubmissions?.length || 0} record${filteredSubmissions?.length !== 1 ? 's' : ''}`}
-                </CardDescription>
+        <div id="data-table-section" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>{selectedForm.display_name}</CardTitle>
+                  <CardDescription>
+                    {submissionsLoading
+                      ? "Loading..."
+                      : `${filteredSubmissions?.length || 0} record${filteredSubmissions?.length !== 1 ? 's' : ''}`}
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleExportSingleForm}
+                    disabled={!filteredSubmissions?.length}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export This Form
+                  </Button>
+                  <Button variant="ghost" onClick={() => setSelectedForm(null)}>
+                    Close
+                  </Button>
+                </div>
               </div>
-              <div className="relative w-64">
+              {/* Search */}
+              <div className="relative w-64 mt-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search records..."
@@ -297,103 +472,103 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 />
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {submissionsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : paginatedSubmissions && paginatedSubmissions.length > 0 ? (
-              <>
-                <div className="border rounded-md overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[100px]">ID</TableHead>
-                        <TableHead>Surveyor</TableHead>
-                        <TableHead>Collected</TableHead>
-                        {displayColumns.map(col => (
-                          <TableHead key={col.key} title={col.label}>
-                            {col.fieldname}
-                          </TableHead>
-                        ))}
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedSubmissions.map((submission) => (
-                        <TableRow key={submission.id}>
-                          <TableCell className="font-mono text-xs">
-                            {submission.local_unique_id?.substring(0, 8)}...
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {submission.surveyor_id || '-'}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {submission.collected_at
-                              ? format(new Date(submission.collected_at), 'yyyy-MM-dd HH:mm')
-                              : '-'}
-                          </TableCell>
-                          {displayColumns.map(col => (
-                            <TableCell key={col.key} className="text-sm max-w-[150px] truncate">
-                              {getFieldValue(submission.data, col.fieldname)}
-                            </TableCell>
-                          ))}
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setSelectedRecord(submission)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+            </CardHeader>
+            <CardContent>
+              {submissionsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-muted-foreground">
-                      Page {currentPage} of {totalPages}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+              ) : paginatedSubmissions && paginatedSubmissions.length > 0 ? (
+                <>
+                  <div className="border rounded-md overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[100px]">ID</TableHead>
+                          <TableHead>Surveyor</TableHead>
+                          <TableHead>Collected</TableHead>
+                          {displayColumns.map(col => (
+                            <TableHead key={col.key} title={col.label}>
+                              {col.fieldname}
+                            </TableHead>
+                          ))}
+                          <TableHead className="w-[50px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedSubmissions.map((submission) => (
+                          <TableRow key={submission.id}>
+                            <TableCell className="font-mono text-xs">
+                              {submission.local_unique_id?.substring(0, 8)}...
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {submission.surveyor_id || '-'}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {submission.collected_at
+                                ? format(new Date(submission.collected_at), 'yyyy-MM-dd HH:mm')
+                                : '-'}
+                            </TableCell>
+                            {displayColumns.map(col => (
+                              <TableCell key={col.key} className="text-sm max-w-[150px] truncate">
+                                {getFieldValue(submission.data, col.fieldname)}
+                              </TableCell>
+                            ))}
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setSelectedRecord(submission)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-12">
-                <Database className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">
-                  {searchTerm ? "No records match your search." : "No data collected yet for this form."}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4">
+                      <p className="text-sm text-muted-foreground">
+                        Page {currentPage} of {totalPages}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <Database className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">
+                    {searchTerm ? "No records match your search." : "No data collected yet for this form."}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Record Detail Dialog */}
@@ -447,7 +622,7 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
                   </TableHeader>
                   <TableBody>
                     {selectedRecord.data && Object.entries(selectedRecord.data)
-                      .filter(([key]) => !key.startsWith('_')) // Hide internal fields
+                      .filter(([key]) => !key.startsWith('_'))
                       .map(([key, value]) => (
                         <TableRow key={key}>
                           <TableCell className="font-mono text-sm">{key}</TableCell>

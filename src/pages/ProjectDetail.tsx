@@ -513,6 +513,7 @@ const ProjectDetail = () => {
               project={project}
               stats={stats}
               onTabChange={handleTabChange}
+              onOpenUploadDialog={() => setIsUploadOpen(true)}
             />
           </TabsContent>
 
@@ -680,6 +681,7 @@ const ProjectDetail = () => {
               projectId={project.id}
               projectName={project.name}
               userRole={userRole}
+              onMemberChange={fetchProjectData}
             />
           </TabsContent>
 

@@ -34,6 +34,9 @@ interface Project {
   created_at: string;
   updated_at: string;
   created_by: string;
+  surveysCount?: number;
+  submissionsCount?: number;
+  membersCount?: number;
 }
 
 const Projects = () => {
@@ -86,7 +89,37 @@ const Projects = () => {
         throw projectsError;
       }
 
-      setProjects(projectsData || []);
+      // Fetch stats for each project
+      const projectsWithStats = await Promise.all(
+        (projectsData || []).map(async (project) => {
+          // Get surveys count
+          const { count: surveysCount } = await supabase
+            .from('survey_packages')
+            .select('*', { count: 'exact', head: true })
+            .eq('project_id', project.id);
+
+          // Get submissions count
+          const { count: submissionsCount } = await supabase
+            .from('submissions')
+            .select('*', { count: 'exact', head: true })
+            .eq('project_id', project.id);
+
+          // Get members count
+          const { count: membersCount } = await supabase
+            .from('project_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('project_id', project.id);
+
+          return {
+            ...project,
+            surveysCount: surveysCount || 0,
+            submissionsCount: submissionsCount || 0,
+            membersCount: membersCount || 0,
+          };
+        })
+      );
+
+      setProjects(projectsWithStats);
     } catch (error: any) {
       console.error('Error in fetchProjects:', error);
       toast({
@@ -286,15 +319,19 @@ const Projects = () => {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="flex items-center gap-2 text-sm">
                       <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">0 surveys</span>
+                      <span className="text-muted-foreground">
+                        {project.surveysCount || 0} survey{project.surveysCount !== 1 ? 's' : ''}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Database className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">0</span>
+                      <span className="text-muted-foreground">{project.submissionsCount || 0}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">1 member</span>
+                      <span className="text-muted-foreground">
+                        {project.membersCount || 0} member{project.membersCount !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                 </CardContent>

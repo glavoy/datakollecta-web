@@ -1,16 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   FileSpreadsheet,
   Database,
   Users,
   Plus,
-  Upload,
-  Eye,
-  UserPlus,
-  TrendingUp
+  TrendingUp,
+  Package
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 interface ProjectOverviewProps {
   project: {
@@ -27,10 +28,51 @@ interface ProjectOverviewProps {
     membersCount: number;
   };
   onTabChange: (tab: string) => void;
+  onOpenUploadDialog: () => void;
 }
 
-const ProjectOverview = ({ project, stats, onTabChange }: ProjectOverviewProps) => {
+interface SurveyStats {
+  id: string;
+  name: string;
+  display_name: string;
+  recordCount: number;
+}
+
+const ProjectOverview = ({ project, stats, onTabChange, onOpenUploadDialog }: ProjectOverviewProps) => {
   const navigate = useNavigate();
+
+  // Fetch survey-level stats for Data Collection Summary
+  const { data: surveyStats } = useQuery({
+    queryKey: ['surveyStats', project.id],
+    queryFn: async (): Promise<SurveyStats[]> => {
+      // Get all surveys for the project
+      const { data: surveys } = await supabase
+        .from('survey_packages')
+        .select('id, name, display_name')
+        .eq('project_id', project.id)
+        .order('version_date', { ascending: false });
+
+      if (!surveys) return [];
+
+      // Get record count for each survey
+      const surveysWithCounts = await Promise.all(
+        surveys.map(async (survey) => {
+          const { count } = await supabase
+            .from('submissions')
+            .select('*', { count: 'exact', head: true })
+            .eq('survey_package_id', survey.id);
+
+          return {
+            ...survey,
+            recordCount: count || 0
+          };
+        })
+      );
+
+      return surveysWithCounts.filter(s => s.recordCount > 0);
+    },
+    enabled: stats.submissionsCount > 0,
+  });
 
   return (
     <div className="space-y-6">
@@ -83,71 +125,44 @@ const ProjectOverview = ({ project, stats, onTabChange }: ProjectOverviewProps) 
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => navigate(`/app/projects/${project.slug}/surveys/new`)}
-            >
-              <Plus className="h-5 w-5" />
-              <span>Create Survey</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => onTabChange("surveys")}
-            >
-              <Upload className="h-5 w-5" />
-              <span>Upload Survey ZIP</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => onTabChange("data")}
-            >
-              <Eye className="h-5 w-5" />
-              <span>View Data</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2"
-              onClick={() => onTabChange("team")}
-            >
-              <UserPlus className="h-5 w-5" />
-              <span>Add Field Team</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity Placeholder */}
-      {stats.submissionsCount > 0 && (
+      {/* Data Collection Summary */}
+      {stats.submissionsCount > 0 && surveyStats && surveyStats.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-muted-foreground" />
-              <CardTitle className="text-lg">Data Collection Summary</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8 text-muted-foreground">
-              <p>{stats.submissionsCount} record{stats.submissionsCount !== 1 ? 's' : ''} collected</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-lg">Data Collection Summary</CardTitle>
+              </div>
               <Button
-                variant="link"
-                className="mt-2"
+                variant="outline"
+                size="sm"
                 onClick={() => onTabChange("data")}
               >
                 View all data
               </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {surveyStats.map((survey) => (
+                <div
+                  key={survey.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                  onClick={() => onTabChange("data")}
+                >
+                  <div className="flex items-center gap-3">
+                    <Package className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{survey.display_name}</p>
+                      <p className="text-sm text-muted-foreground">{survey.name}</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary">
+                    {survey.recordCount} record{survey.recordCount !== 1 ? 's' : ''}
+                  </Badge>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -161,18 +176,12 @@ const ProjectOverview = ({ project, stats, onTabChange }: ProjectOverviewProps) 
             <h3 className="text-lg font-semibold mb-2">Get Started</h3>
             <p className="text-muted-foreground text-center mb-6 max-w-md">
               Create your first survey to start collecting data. You can design a new survey
-              or upload an existing survey package.
+              or go to the Surveys tab to upload an existing survey package.
             </p>
-            <div className="flex gap-3">
-              <Button onClick={() => navigate(`/app/projects/${project.slug}/surveys/new`)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Survey
-              </Button>
-              <Button variant="outline" onClick={() => onTabChange("surveys")}>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload ZIP
-              </Button>
-            </div>
+            <Button onClick={() => navigate(`/app/projects/${project.slug}/surveys/new`)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Survey
+            </Button>
           </CardContent>
         </Card>
       )}

@@ -78,7 +78,7 @@ export const projectMemberService = {
   async addMember(
     projectId: string,
     userId: string,
-    role: 'editor' | 'viewer',
+    role: 'owner' | 'editor' | 'viewer',
     invitedBy: string
   ): Promise<void> {
     // Check if user is already a member
@@ -115,7 +115,7 @@ export const projectMemberService = {
    */
   async updateMemberRole(
     memberId: string,
-    newRole: 'editor' | 'viewer'
+    newRole: 'owner' | 'editor' | 'viewer'
   ): Promise<void> {
     const { error } = await supabase
       .from('project_members')
