@@ -66,7 +66,6 @@ interface ProjectDataProps {
 
 const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
   const [selectedForm, setSelectedForm] = useState<FormWithCount | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRecord, setSelectedRecord] = useState<Submission | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
@@ -166,23 +165,8 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
     }));
   }, [selectedForm]);
 
-  // Filter submissions by search term
-  const filteredSubmissions = useMemo(() => {
-    if (!submissions) return [];
-    if (!searchTerm) return submissions;
-
-    const term = searchTerm.toLowerCase();
-    return submissions.filter(sub => {
-      if (sub.local_unique_id?.toLowerCase().includes(term)) return true;
-      if (sub.surveyor_id?.toLowerCase().includes(term)) return true;
-      if (sub.data) {
-        return Object.values(sub.data).some(val =>
-          String(val).toLowerCase().includes(term)
-        );
-      }
-      return false;
-    });
-  }, [submissions, searchTerm]);
+  // No filtering needed
+  const filteredSubmissions = submissions || [];
 
   // Pagination
   const totalPages = Math.ceil((filteredSubmissions?.length || 0) / pageSize);
@@ -262,8 +246,10 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+    const filename = `${selectedForm.table_name}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+
     link.href = url;
-    link.download = `${selectedForm.table_name}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -337,11 +323,7 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
   const handleSelectForm = (form: FormWithCount) => {
     setSelectedForm(form);
     setCurrentPage(1);
-    setSearchTerm("");
-    // Scroll to data table section
-    setTimeout(() => {
-      document.getElementById('data-table-section')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+    // Removed searchTerm clear and scroll since search is gone and we use a dialog
   };
 
   const getFieldValue = (data: Record<string, any>, fieldname: string) => {
@@ -401,11 +383,7 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
                     {survey.forms.map((form) => (
                       <div
                         key={form.id}
-                        className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
-                          selectedForm?.id === form.id
-                            ? 'bg-accent border-primary'
-                            : 'hover:bg-accent cursor-pointer'
-                        }`}
+                        className={`flex items-center justify-between p-3 border rounded-lg transition-colors hover:bg-accent cursor-pointer`}
                         onClick={() => handleSelectForm(form)}
                       >
                         <div>
@@ -434,142 +412,129 @@ const ProjectData = ({ projectId, projectName }: ProjectDataProps) => {
         </Card>
       )}
 
-      {/* Data Table Section */}
-      {selectedForm && (
-        <div id="data-table-section" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>{selectedForm.display_name}</CardTitle>
-                  <CardDescription>
-                    {submissionsLoading
-                      ? "Loading..."
-                      : `${filteredSubmissions?.length || 0} record${filteredSubmissions?.length !== 1 ? 's' : ''}`}
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleExportSingleForm}
-                    disabled={!filteredSubmissions?.length}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export This Form
-                  </Button>
-                  <Button variant="ghost" onClick={() => setSelectedForm(null)}>
-                    Close
-                  </Button>
-                </div>
+      {/* Main Data Table Dialog */}
+      <Dialog open={!!selectedForm} onOpenChange={(open) => !open && setSelectedForm(null)}>
+        <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-6 border-b shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>{selectedForm?.display_name}</DialogTitle>
+                <DialogDescription>
+                  {submissionsLoading
+                    ? "Loading..."
+                    : `${filteredSubmissions?.length || 0} record${filteredSubmissions?.length !== 1 ? 's' : ''}`}
+                </DialogDescription>
               </div>
-              {/* Search */}
-              <div className="relative w-64 mt-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search records..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                />
+              <div className="flex gap-2 mr-8"> {/* mr-8 to avoid overlap with close button */}
+                <Button
+                  variant="outline"
+                  onClick={handleExportSingleForm}
+                  disabled={!filteredSubmissions?.length}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export This Form
+                </Button>
               </div>
-            </CardHeader>
-            <CardContent>
-              {submissionsLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : paginatedSubmissions && paginatedSubmissions.length > 0 ? (
-                <>
-                  <div className="border rounded-md overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[100px]">ID</TableHead>
-                          <TableHead>Surveyor</TableHead>
-                          <TableHead>Collected</TableHead>
-                          {displayColumns.map(col => (
-                            <TableHead key={col.key} title={col.label}>
-                              {col.fieldname}
-                            </TableHead>
-                          ))}
-                          <TableHead className="w-[50px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedSubmissions.map((submission) => (
-                          <TableRow key={submission.id}>
-                            <TableCell className="font-mono text-xs">
-                              {submission.local_unique_id?.substring(0, 8)}...
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {submission.surveyor_id || '-'}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {submission.collected_at
-                                ? format(new Date(submission.collected_at), 'yyyy-MM-dd HH:mm')
-                                : '-'}
-                            </TableCell>
-                            {displayColumns.map(col => (
-                              <TableCell key={col.key} className="text-sm max-w-[150px] truncate">
-                                {getFieldValue(submission.data, col.fieldname)}
-                              </TableCell>
-                            ))}
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setSelectedRecord(submission)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+            </div>
 
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-4">
-                      <p className="text-sm text-muted-foreground">
-                        Page {currentPage} of {totalPages}
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                          Previous
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <Database className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">
-                    {searchTerm ? "No records match your search." : "No data collected yet for this form."}
-                  </p>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto p-6 bg-muted/10">
+            {submissionsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : paginatedSubmissions && paginatedSubmissions.length > 0 ? (
+              <div className="grid gap-4">
+                <div className="border rounded-md bg-background overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[100px]">ID</TableHead>
+                        <TableHead>Surveyor</TableHead>
+                        <TableHead>Collected</TableHead>
+                        {displayColumns.map(col => (
+                          <TableHead key={col.key} title={col.label}>
+                            {col.fieldname}
+                          </TableHead>
+                        ))}
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedSubmissions.map((submission) => (
+                        <TableRow key={submission.id}>
+                          <TableCell className="font-mono text-xs">
+                            {submission.local_unique_id?.substring(0, 8)}...
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {submission.surveyor_id || '-'}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {submission.collected_at
+                              ? format(new Date(submission.collected_at), 'yyyy-MM-dd HH:mm')
+                              : '-'}
+                          </TableCell>
+                          {displayColumns.map(col => (
+                            <TableCell key={col.key} className="text-sm max-w-[150px] truncate">
+                              {getFieldValue(submission.data, col.fieldname)}
+                            </TableCell>
+                          ))}
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setSelectedRecord(submission)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <Database className="h-12 w-12 text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">
+                  No data collected yet for this form.
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Record Detail Dialog */}
       <Dialog open={!!selectedRecord} onOpenChange={(open) => !open && setSelectedRecord(null)}>
