@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom"; // Added Link
 import { SurveyPackage, SurveyForm, SurveyQuestion, QuestionType } from "@/types/survey";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,8 @@ import {
   FileSpreadsheet,
   Copy,
   CloudUpload,
-  Loader2
+  Loader2,
+  ArrowLeft
 } from "lucide-react";
 import {
   DndContext,
@@ -104,10 +106,11 @@ interface SurveyDesignerProps {
   initialPackage?: SurveyPackage;
   onSave?: (pkg: SurveyPackage) => void;
   projectId?: string | null;
+  projectSlug?: string;
   userId?: string;
 }
 
-const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDesignerProps) => {
+const SurveyDesigner = ({ initialPackage, onSave, projectId, projectSlug, userId }: SurveyDesignerProps) => {
   const { toast } = useToast();
   const [surveyPackage, setSurveyPackage] = useState<SurveyPackage>(
     initialPackage || {
@@ -292,6 +295,13 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
       {/* Package Header */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <div className="flex items-center gap-4">
+          {projectSlug && (
+            <Link to={`/app/projects/${projectSlug}?tab=surveys`}>
+              <Button variant="ghost" size="icon" title="Back to Project">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
           <div
             className="text-lg font-semibold cursor-pointer hover:underline"
             onClick={() => setShowGlobalSettings(true)}

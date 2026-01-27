@@ -1,6 +1,8 @@
 # To Do
 
 - add error checking before creating/saving the xml file/survey.zip - complete error checking
+- when deleting a survey, there is a confirmation box, but add another level of security - maybe typing in the surveyID to confirm
+- add a cancel button to the 'Upload Survey Package' dialog box
 
 - when upload a zip file for a survey - questions that use csv as the data source are not showing all the options properly in the 'designer'
 - Need a way to add csv files to a survey 

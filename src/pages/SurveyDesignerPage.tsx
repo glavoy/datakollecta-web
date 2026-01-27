@@ -69,7 +69,6 @@ const SurveyDesignerPage = () => {
             id: crypto.randomUUID(),
             surveyId: '', // Logical ID (e.g. filename base), user should set this
             name: `${projectData.name} Survey`,
-            version: '1.0',
             forms: []
           });
         }
@@ -104,6 +103,7 @@ const SurveyDesignerPage = () => {
       <div className="h-[calc(100vh-8rem)]">
         <SurveyDesigner
           projectId={projectId}
+          projectSlug={slug}
           userId={user?.id}
           initialPackage={initialPackage}
         />

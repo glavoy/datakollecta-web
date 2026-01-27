@@ -121,6 +121,11 @@ const ProjectDetail = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadDescription, setUploadDescription] = useState("");
+
+  // Delete Dialog State
+  const [surveyToDelete, setSurveyToDelete] = useState<SurveyPackage | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   useEffect(() => {
     if (slug) {
@@ -302,6 +307,9 @@ const ProjectDetail = () => {
         title: "Survey deleted",
         description: "The survey package and its file have been removed.",
       });
+
+      setSurveyToDelete(null);
+      setDeleteConfirmation("");
       fetchProjectData();
     } catch (error: any) {
       console.error("Delete error:", error);
@@ -381,11 +389,12 @@ const ProjectDetail = () => {
           name: surveyId,
           display_name: manifest.surveyName || surveyId,
           version_date: new Date().toISOString(),
-          description: manifest.description || "",
+          description: uploadDescription || manifest.description || "",
           zip_file_path: filePath,
           manifest: manifest,
           status: 'active',
-          created_by: user?.id
+          created_by: user?.id,
+          published_at: new Date().toISOString()
         })
         .select()
         .single();
@@ -449,18 +458,33 @@ const ProjectDetail = () => {
 
       toast({
         title: "Success",
-        description: `Survey uploaded. ${crfsToInsert.length} form(s) processed.`,
+        description: `Survey uploaded and published. ${crfsToInsert.length} form(s) processed.`,
       });
 
       setIsUploadOpen(false);
       setUploadFile(null);
+      setUploadDescription(""); // Reset description
       fetchProjectData();
 
     } catch (error: any) {
       console.error('Upload error:', error);
+
+      let errorMessage = error.message || "Failed to process survey package.";
+
+      // Handle unique constraint violations for survey ID
+      if (error.code === '23505') {
+        if (
+          error.message?.includes('survey_packages_name_created_by_idx') ||
+          error.details?.includes('survey_packages_name_created_by_idx') ||
+          JSON.stringify(error).includes('survey_packages_name_created_by_idx')
+        ) {
+          errorMessage = "You already have a survey with this ID (Survey Name). Please verify that the 'surveyId' in your manifest is unique.";
+        }
+      }
+
       toast({
         title: "Upload Failed",
-        description: error.message || "Failed to process survey package.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -591,11 +615,31 @@ const ProjectDetail = () => {
                               The zip filename will be used as the unique Survey ID.
                             </p>
                           </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="description">Description</Label>
+                            <Input
+                              id="description"
+                              placeholder="e.g. Initial draft for field test"
+                              value={uploadDescription}
+                              onChange={(e) => setUploadDescription(e.target.value)}
+                            />
+                          </div>
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="flex justify-between gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setIsUploadOpen(false);
+                              setUploadFile(null);
+                              setUploadDescription("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
                           <Button type="submit" disabled={uploading || !uploadFile}>
                             {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Upload
+                            Upload & Publish
                           </Button>
                         </DialogFooter>
                       </form>
@@ -672,30 +716,17 @@ const ProjectDetail = () => {
                               <Download className="h-4 w-4" />
                             </Button>
                             {canEdit && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Survey?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will permanently delete this survey version and all its forms. Data collected for this version will also be deleted.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteSurvey(survey.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  setSurveyToDelete(survey);
+                                  setDeleteConfirmation("");
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             )}
                           </div>
                         </TableCell>
@@ -739,9 +770,50 @@ const ProjectDetail = () => {
               onProjectUpdate={fetchProjectData}
             />
           </TabsContent>
-        </Tabs>
-      </div>
-    </AppLayout>
+        </Tabs >
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={!!surveyToDelete} onOpenChange={(open) => !open && setSurveyToDelete(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Survey?</DialogTitle>
+              <DialogDescription>
+                This will permanently delete the survey version <span className="font-bold text-foreground">{surveyToDelete?.display_name}</span> ({surveyToDelete?.name}) and all its forms.
+                <br /><br />
+                <span className="text-destructive font-semibold">Warning: All data collected for this version will also be deleted.</span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Label htmlFor="confirm-delete">
+                Type <span className="font-bold text-foreground">{surveyToDelete?.name}</span> to confirm:
+              </Label>
+              <Input
+                id="confirm-delete"
+                placeholder={surveyToDelete?.name}
+                className="mt-2"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setSurveyToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleteConfirmation !== surveyToDelete?.name}
+                onClick={() => surveyToDelete && handleDeleteSurvey(surveyToDelete.id)}
+              >
+                Delete Survey
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div >
+    </AppLayout >
   );
 };
 
