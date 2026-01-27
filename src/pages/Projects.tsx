@@ -187,8 +187,31 @@ const Projects = () => {
       console.error("Error creating project:", error);
 
       let errorMessage = error.message || "Failed to create project";
-      if (error.code === '23505' || errorMessage.includes('unique') || errorMessage.includes('slug')) {
-        errorMessage = "This project code is already taken. Please choose another.";
+
+      // Handle unique constraint violations
+      if (error.code === '23505') { // unique_violation
+        // Check message, details, or if the stringified error contains the keywords
+        // This covers cases where Supabase might wrap the error differently
+        const errorString = JSON.stringify(error).toLowerCase();
+        const message = error.message?.toLowerCase() || '';
+        const details = error.details?.toLowerCase() || '';
+
+        if (
+          message.includes('slug') ||
+          details.includes('slug') ||
+          errorString.includes('projects_slug_key')
+        ) {
+          errorMessage = "This Project Code is already taken by another project. Please choose a unique code.";
+        } else if (
+          message.includes('name') ||
+          details.includes('name') ||
+          errorString.includes('projects_name_created_by_idx')
+        ) {
+          errorMessage = "You already have a project with this name.";
+        } else {
+          // Fallback for other unique violations
+          errorMessage = "A project with this name or code already exists.";
+        }
       }
 
       toast({

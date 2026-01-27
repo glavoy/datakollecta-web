@@ -344,7 +344,7 @@ CREATE TABLE public.crfs (
   fields jsonb,
   id_config jsonb,
   display_fields text,
-  auto_start_repeat boolean DEFAULT false,
+  auto_start_repeat int DEFAULT 0,
   repeat_enforce_count integer,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT crfs_pkey PRIMARY KEY (id),
