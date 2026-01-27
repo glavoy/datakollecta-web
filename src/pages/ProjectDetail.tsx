@@ -247,6 +247,7 @@ const ProjectDetail = () => {
     try {
       const surveyToDelete = surveys.find(s => s.id === surveyId);
 
+      // Delete the zip file from storage first
       if (surveyToDelete && surveyToDelete.zip_file_path) {
         const { error: storageError } = await supabase.storage
           .from('surveys')
@@ -254,6 +255,8 @@ const ProjectDetail = () => {
 
         if (storageError) {
           console.error("Error deleting file from storage:", storageError);
+          // Don't throw - continue with database deletion even if storage fails
+          // The file might already be deleted or not exist
         }
       }
 
@@ -339,22 +342,44 @@ const ProjectDetail = () => {
         throw new Error("Invalid Manifest: 'crfs' array is missing or empty.");
       }
 
-      const filePath = `surveys/${project.id}/${uploadFile.name}`;
+      // Get surveyId from manifest (this is the unique identifier)
+      const surveyId = manifest.surveyId;
+      if (!surveyId) {
+        throw new Error("Invalid Manifest: 'surveyId' is required.");
+      }
+
+      // Check if survey already exists - REJECT if it does
+      const { data: existingSurvey } = await supabase
+        .from('survey_packages')
+        .select('id, display_name')
+        .eq('project_id', project.id)
+        .eq('name', surveyId)
+        .maybeSingle();
+
+      if (existingSurvey) {
+        throw new Error(
+          `A survey with ID "${surveyId}" already exists in this project. ` +
+          `Please delete the existing survey "${existingSurvey.display_name}" first, or use a different Survey ID in the manifest.`
+        );
+      }
+
+      // Use surveyId from manifest as the storage filename (consistent with surveyService.ts)
+      const sanitizedSurveyId = surveyId.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+      const filePath = `${project.id}/${sanitizedSurveyId}.zip`;
+
       const { error: storageError } = await supabase.storage
         .from('surveys')
         .upload(filePath, uploadFile);
 
       if (storageError) throw storageError;
 
-      const rawFilename = uploadFile.name.replace(/\.zip$/i, "");
-      const surveyId = rawFilename.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
-
+      // Insert new survey
       const { data: surveyData, error: dbError } = await supabase
         .from('survey_packages')
         .insert({
           project_id: project.id,
           name: surveyId,
-          display_name: manifest.surveyName || rawFilename,
+          display_name: manifest.surveyName || surveyId,
           version_date: new Date().toISOString(),
           description: manifest.description || "",
           zip_file_path: filePath,
@@ -387,6 +412,13 @@ const ProjectDetail = () => {
         const xmlContent = await xmlFile.async("string");
         const questions = parseSurveyXml(xmlContent);
 
+        // Store additional form config in id_config._formConfig for retrieval
+        const formConfig = {
+          incrementField: crfEntry.incrementfield,
+          repeatCountField: crfEntry.repeat_count_field,
+          entry_condition: crfEntry.entry_condition,
+        };
+
         crfsToInsert.push({
           survey_package_id: surveyData.id,
           project_id: project.id,
@@ -394,10 +426,15 @@ const ProjectDetail = () => {
           display_name: crfEntry.displayname,
           display_order: crfEntry.display_order || 0,
           is_base: crfEntry.isbase === 1,
-          primary_key: crfEntry.primarykey,
-          linking_field: crfEntry.linkingfield,
-          id_config: crfEntry.idconfig,
-          display_fields: crfEntry.display_fields,
+          primary_key: crfEntry.primarykey || null,
+          linking_field: crfEntry.linkingfield || null,
+          parent_table: crfEntry.parenttable || null,
+          id_config: crfEntry.idconfig
+            ? { ...crfEntry.idconfig, _formConfig: formConfig }
+            : { _formConfig: formConfig },
+          display_fields: crfEntry.display_fields || null,
+          auto_start_repeat: crfEntry.auto_start_repeat || 0,
+          repeat_enforce_count: crfEntry.repeat_enforce_count || 1,
           fields: questions
         });
       }

@@ -3,6 +3,7 @@ import JSZip from "jszip";
 
 function escapeXml(text: string | number | undefined | null): string {
   if (text === undefined || text === null) return '';
+  // Convert to string first - this handles 0 correctly (Number 0 -> "0")
   const str = String(text);
   return str
     .replace(/&/g, '&amp;')
@@ -15,11 +16,8 @@ function escapeXml(text: string | number | undefined | null): string {
 function generateQuestionXml(question: SurveyQuestion, indent: string = '    '): string {
   const lines: string[] = [];
 
-  // Map 'calculated' to 'automatic' for XML backward compatibility
-  const xmlType = question.type === 'calculated' ? 'automatic' : question.type;
-
   // 0. Opening tag with attributes
-  lines.push(`${indent}<question type='${xmlType}' fieldname='${question.fieldname}' fieldtype='${question.fieldtype}'>`);
+  lines.push(`${indent}<question type='${question.type}' fieldname='${question.fieldname}' fieldtype='${question.fieldtype}'>`);
 
   // 1. Text
   if (question.text) {
@@ -29,31 +27,43 @@ function generateQuestionXml(question: SurveyQuestion, indent: string = '    '):
   // 2. Calculation
   if (question.calculation) {
     const calc = question.calculation;
-    let calcTag = `${indent}    <calculation type='${calc.type}'`;
-    
-    if (calc.field) calcTag += ` field='${calc.field}'`;
-    if (calc.value) calcTag += ` value='${calc.value}'`;
-    if (calc.unit) calcTag += ` unit='${calc.unit}'`;
-    if (calc.separator) calcTag += ` separator='${calc.separator}'`;
-    
-    if (calc.type === 'case' && calc.cases) {
-      calcTag += '>';
-      lines.push(calcTag);
-      
+
+    if (calc.type === 'query' && calc.sql) {
+      // Query type calculation with SQL
+      lines.push(`${indent}    <calculation type='query'>`);
+      lines.push(`${indent}        <sql>${escapeXml(calc.sql)}</sql>`);
+      if (calc.params && calc.params.length > 0) {
+        calc.params.forEach(p => {
+          lines.push(`${indent}        <parameter name='${p.name}' field='${p.field}'/>`);
+        });
+      }
+      lines.push(`${indent}    </calculation>`);
+    } else if (calc.type === 'case' && calc.cases) {
+      // Case type calculation
+      lines.push(`${indent}    <calculation type='case'>`);
+
       calc.cases.forEach(c => {
         lines.push(`${indent}        <when field='${c.field}' operator='${escapeXml(c.operator)}' value='${c.value}'>`);
         lines.push(`${indent}            <result type='constant' value='${c.result}'/>`);
         lines.push(`${indent}        </when>`);
       });
-      
+
       if (calc.elseResult) {
         lines.push(`${indent}        <else>`);
         lines.push(`${indent}            <result type='constant' value='${calc.elseResult}'/>`);
         lines.push(`${indent}        </else>`);
       }
-      
+
       lines.push(`${indent}    </calculation>`);
     } else {
+      // Other calculation types (age_from_date, date_diff, etc.)
+      let calcTag = `${indent}    <calculation type='${calc.type}'`;
+
+      if (calc.field) calcTag += ` field='${calc.field}'`;
+      if (calc.value) calcTag += ` value='${calc.value}'`;
+      if (calc.unit) calcTag += ` unit='${calc.unit}'`;
+      if (calc.separator) calcTag += ` separator='${calc.separator}'`;
+
       calcTag += '/>';
       lines.push(calcTag);
     }
@@ -112,22 +122,34 @@ function generateQuestionXml(question: SurveyQuestion, indent: string = '    '):
   
   if (question.dynamicResponses) {
     const dr = question.dynamicResponses;
-    const sourceAttr = dr.source === 'csv' 
-      ? `source='csv' file='${dr.file}'` 
+    const sourceAttr = dr.source === 'csv'
+      ? `source='csv' file='${dr.file}'`
       : `source='database' table='${dr.table}'`;
     lines.push(`${indent}    <responses ${sourceAttr}>`);
-    
+
     dr.filters.forEach(filter => {
       lines.push(`${indent}        <filter column='${filter.column}' operator='${filter.operator}' value='${filter.value}'/>`);
     });
-    
+
     lines.push(`${indent}        <display column='${dr.displayColumn}'/>`);
     lines.push(`${indent}        <value column='${dr.valueColumn}'/>`);
-    
+
+    if (dr.emptyMessage) {
+      lines.push(`${indent}        <empty_message>${escapeXml(dr.emptyMessage)}</empty_message>`);
+    }
+
+    if (dr.notInList) {
+      lines.push(`${indent}        <not_in_list value='${dr.notInList.value}' label='${escapeXml(dr.notInList.label)}'/>`);
+    }
+
+    if (dr.dontKnow) {
+      lines.push(`${indent}        <dont_know value='${dr.dontKnow.value}' label='${escapeXml(dr.dontKnow.label)}'/>`);
+    }
+
     if (dr.distinct) {
       lines.push(`${indent}        <distinct>true</distinct>`);
     }
-    
+
     lines.push(`${indent}    </responses>`);
   }
   
@@ -165,17 +187,13 @@ function generateQuestionXml(question: SurveyQuestion, indent: string = '    '):
     lines.push(`${indent}    </postskip>`);
   }
   
-  // 10. Dont Know / Refuse / NA
+  // 10. Dont Know / Refuse (Not Applicable removed globally)
   if (question.dontKnow) {
     lines.push(`${indent}    <dont_know>${question.dontKnow}</dont_know>`);
   }
 
   if (question.refuse) {
     lines.push(`${indent}    <refuse>${question.refuse}</refuse>`);
-  }
-
-  if (question.na) {
-    lines.push(`${indent}    <na>${question.na}</na>`);
   }
 
   // 11. Closing tag
@@ -210,27 +228,42 @@ export const generateManifestGistx = (pkg: SurveyPackage): string => {
     surveyId: pkg.surveyId,
     databaseName: pkg.databaseName || `${pkg.surveyId}.sqlite`,
     xmlFiles: pkg.forms.map(f => `${f.tablename}.xml`),
-    crfs: pkg.forms.map(form => ({
-      display_order: form.displayOrder,
-      tablename: form.tablename,
-      displayname: form.displayname,
-      isbase: form.parenttable ? 0 : 1, 
-      primarykey: form.primaryKey || (form.questions.find(q => q.fieldname === "subjid") ? "subjid" : "id"),
-      linkingfield: form.linkingfield,
-      parenttable: form.parenttable,
-      incrementfield: form.incrementField,
-      requireslink: form.parenttable ? 1 : 0,
-      repeat_count_field: form.repeatCountField,
-      auto_start_repeat: form.autoStartRepeat,
-      repeat_enforce_count: form.repeatEnforceCount,
-      display_fields: form.displayFields,
-      entry_condition: form.entry_condition,
-      idconfig: form.idconfig ? {
-        prefix: form.idconfig.prefix,
-        fields: form.idconfig.fields,
-        incrementLength: form.idconfig.incrementLength
-      } : undefined
-    }))
+    crfs: pkg.forms.map(form => {
+      const isBase = !form.parenttable;
+
+      // Base object with common fields
+      const crf: Record<string, any> = {
+        display_order: form.displayOrder,
+        tablename: form.tablename,
+        displayname: form.displayname,
+        isbase: isBase ? 1 : 0,
+        primarykey: form.primaryKey || (form.questions.find(q => q.fieldname === "subjid") ? "subjid" : "id"),
+        linkingfield: form.linkingfield,
+      };
+
+      // Only add child form specific fields if not a base form
+      if (!isBase) {
+        crf.parenttable = form.parenttable;
+        crf.incrementfield = form.incrementField;
+        crf.requireslink = 1;
+        crf.repeat_count_field = form.repeatCountField;
+        crf.auto_start_repeat = form.autoStartRepeat;
+        crf.repeat_enforce_count = form.repeatEnforceCount;
+        crf.display_fields = form.displayFields;
+        crf.entry_condition = form.entry_condition;
+      }
+
+      // ID config is used for base forms
+      if (form.idconfig) {
+        crf.idconfig = {
+          prefix: form.idconfig.prefix,
+          fields: form.idconfig.fields,
+          incrementLength: form.idconfig.incrementLength
+        };
+      }
+
+      return crf;
+    })
   };
 
   return JSON.stringify(manifest, null, 2);
@@ -250,25 +283,30 @@ export function downloadFile(content: string, filename: string, type: string = '
 
 export async function downloadSurveyZip(pkg: SurveyPackage) {
   const zip = new JSZip();
-  
+
   // Add manifest
   const manifestJson = generateManifestGistx(pkg);
   zip.file('survey_manifest.gistx', manifestJson);
-  
+
   // Add each form as XML
   pkg.forms.forEach(form => {
     const xml = generateFormXml(form);
     zip.file(`${form.tablename}.xml`, xml);
   });
-  
+
+  // Add CSV files
+  if (pkg.csvFiles && pkg.csvFiles.length > 0) {
+    pkg.csvFiles.forEach(csvFile => {
+      zip.file(csvFile.filename, csvFile.content);
+    });
+  }
+
   // Generate zip file
   const content = await zip.generateAsync({ type: "blob" });
-  
-  // Create filename: project_name_yyyy-mm-dd.zip
-  const date = new Date().toISOString().split('T')[0];
-  const sanitizedProjectName = pkg.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const filename = `${sanitizedProjectName}_${date}.zip`;
-  
+
+  // Create filename using surveyId (which includes version info)
+  const filename = `${pkg.surveyId || pkg.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.zip`;
+
   // Download logic (reusing basic anchor tag approach)
   const url = URL.createObjectURL(content);
   const a = document.createElement('a');

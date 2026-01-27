@@ -163,14 +163,20 @@ export interface SurveyForm {
   questions: SurveyQuestion[];
 }
 
+export interface CsvFile {
+  id: string;
+  filename: string;
+  content: string; // CSV content as string
+}
+
 export interface SurveyPackage {
   id: string; // Database UUID
   surveyId: string; // Logical ID (e.g. prism_css_v1), maps to survey_packages.name
   name: string; // Display Name, maps to survey_packages.display_name
-  version: string;
   forms: SurveyForm[];
-  
+
   // Global Manifest settings
   databaseName?: string;
   xmlFiles?: string[];
+  csvFiles?: CsvFile[]; // CSV files included in the survey package
 }

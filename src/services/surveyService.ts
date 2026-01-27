@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { SurveyPackage } from "@/types/survey";
+import { SurveyPackage, CsvFile } from "@/types/survey";
 import { generateManifestGistx, generateFormXml } from "@/lib/xmlGenerator";
 import JSZip from "jszip";
 
@@ -26,12 +26,22 @@ export const surveyService = {
       zip.file(`${form.tablename}.xml`, xml);
     });
 
+    // Add CSV files to the zip
+    if (pkg.csvFiles && pkg.csvFiles.length > 0) {
+      pkg.csvFiles.forEach(csvFile => {
+        zip.file(csvFile.filename, csvFile.content);
+      });
+    }
+
     const zipBlob = await zip.generateAsync({ type: "blob" });
 
     // 2. Upload Zip to Storage (Bucket: 'surveys')
-    const date = new Date().toISOString().split('T')[0];
-    const sanitizedName = surveyName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const filePath = `${projectId}/${sanitizedName}_v${pkg.version}_${date}_${Date.now()}.zip`;
+    // Use surveyId as the filename (surveyId should include version info like geoff_css_2026-01-24)
+    const sanitizedName = surveyName.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+    const filePath = `${projectId}/${sanitizedName}.zip`;
+
+    // Delete existing file if it exists (for updates)
+    await supabase.storage.from('surveys').remove([filePath]);
 
     const { error: uploadError } = await supabase.storage
       .from('surveys')
@@ -62,25 +72,53 @@ export const surveyService = {
 
     // 4. Update/Insert individual CRFs (linked to survey_package)
     for (const form of pkg.forms) {
+      // Store form configuration including additional fields in the fields JSONB
+      // We'll include form-level config as a special entry
+      const formConfig = {
+        incrementField: form.incrementField,
+        repeatCountField: form.repeatCountField,
+        entry_condition: form.entry_condition,
+      };
+
       const { error: crfError } = await supabase
         .from('crfs')
         .upsert({
           id: form.id,
-          survey_package_id: surveyPackage.id, // NEW: Link to survey package
+          survey_package_id: surveyPackage.id, // Link to survey package
           project_id: projectId,
           table_name: form.tablename,
           display_name: form.displayname,
           display_order: form.displayOrder,
           parent_table: form.parenttable,
           linking_field: form.linkingfield,
-          id_config: form.idconfig, // Fix: use 'idconfig' from type
+          primary_key: form.primaryKey,
+          id_config: form.idconfig ? {
+            ...form.idconfig,
+            // Also store additional form config here for portability
+            _formConfig: formConfig
+          } : { _formConfig: formConfig },
           display_fields: form.displayFields,
           fields: form.questions, // JSONB column
-          auto_start_repeat: form.autoStartRepeat,
+          auto_start_repeat: form.autoStartRepeat || 0,
           repeat_enforce_count: form.repeatEnforceCount,
         });
 
       if (crfError) throw crfError;
+    }
+
+    // 5. Store CSV file metadata in survey_packages manifest for retrieval
+    // CSV content is stored in the zip file; metadata stored in manifest
+    // We'll update the manifest to include csvFiles list
+    if (pkg.csvFiles && pkg.csvFiles.length > 0) {
+      const manifestWithCsv = {
+        ...JSON.parse(manifestJson),
+        csvFiles: pkg.csvFiles.map(f => f.filename)
+      };
+
+      await supabase
+        .from('survey_packages')
+        .update({ manifest: manifestWithCsv })
+        .eq('id', surveyPackage.id);
     }
 
     return surveyPackage;
@@ -109,34 +147,98 @@ export const surveyService = {
 
     if (crfsError) throw crfsError;
 
-    // 3. Construct the SurveyPackage object
-    // 3. Construct the SurveyPackage object
-    const manifest = survey.manifest as any; 
+    // 3. Load CSV files from the zip if available
+    let csvFiles: CsvFile[] = [];
+    if (survey.zip_file_path) {
+      csvFiles = await this.loadCsvFilesFromZip(survey.zip_file_path);
+    }
+
+    // 4. Construct the SurveyPackage object
+    const manifest = survey.manifest as any;
     const pkg: SurveyPackage = {
       id: survey.id,
       surveyId: survey.name, // The logical ID
       name: survey.display_name, // The display name
-      version: "1.0", // TODO: stored version
       databaseName: manifest?.databaseName || `${survey.name}.sqlite`,
       xmlFiles: manifest?.xmlFiles || [],
-      forms: (crfs || []).map(crf => ({
-        id: crf.id,
-        tablename: crf.table_name,
-        displayname: crf.display_name,
-        displayOrder: crf.display_order,
-        parenttable: crf.parent_table,
-        linkingfield: crf.linking_field,
-        displayFields: crf.display_fields,
-        idconfig: crf.id_config,
-        questions: crf.fields || [],
-        autoStartRepeat: crf.auto_start_repeat || 0,
-        repeatEnforceCount: crf.repeat_enforce_count || 1,
-        primaryKey: crf.primary_key,
-        incrementField: crf.increment_field,
-        entry_condition: crf.entry_condition,
-      }))
+      csvFiles: csvFiles,
+      forms: (crfs || []).map(crf => {
+        // Extract additional form config from idconfig._formConfig if stored there
+        const idConfig = crf.id_config as any;
+        const formConfig = idConfig?._formConfig || {};
+
+        // Clean idconfig by removing _formConfig before returning
+        const cleanIdConfig = idConfig ? { ...idConfig } : undefined;
+        if (cleanIdConfig?._formConfig) {
+          delete cleanIdConfig._formConfig;
+        }
+
+        // Normalize empty strings to undefined for optional fields
+        const normalizeEmpty = (val: string | null | undefined) =>
+          val && val.trim() !== '' ? val : undefined;
+
+        return {
+          id: crf.id,
+          tablename: crf.table_name,
+          displayname: crf.display_name,
+          displayOrder: crf.display_order,
+          parenttable: normalizeEmpty(crf.parent_table),
+          linkingfield: normalizeEmpty(crf.linking_field),
+          displayFields: normalizeEmpty(crf.display_fields),
+          idconfig: cleanIdConfig?.prefix !== undefined || cleanIdConfig?.fields?.length > 0
+            ? cleanIdConfig
+            : undefined,
+          questions: crf.fields || [],
+          autoStartRepeat: typeof crf.auto_start_repeat === 'number' ? crf.auto_start_repeat : (crf.auto_start_repeat ? 1 : 0),
+          repeatEnforceCount: crf.repeat_enforce_count || 1,
+          primaryKey: normalizeEmpty(crf.primary_key),
+          incrementField: normalizeEmpty(formConfig.incrementField) || normalizeEmpty(crf.increment_field),
+          repeatCountField: normalizeEmpty(formConfig.repeatCountField),
+          entry_condition: normalizeEmpty(formConfig.entry_condition) || normalizeEmpty(crf.entry_condition),
+        };
+      })
     };
     return pkg;
+  },
+
+  /**
+   * Load CSV files from a zip file in storage
+   */
+  async loadCsvFilesFromZip(zipFilePath: string): Promise<CsvFile[]> {
+    try {
+      const { data, error } = await supabase.storage
+        .from('surveys')
+        .download(zipFilePath);
+
+      if (error || !data) {
+        console.error('Error downloading zip for CSV extraction:', error);
+        return [];
+      }
+
+      const zip = new JSZip();
+      const loadedZip = await zip.loadAsync(data);
+      const csvFiles: CsvFile[] = [];
+
+      const filePromises: Promise<void>[] = [];
+      loadedZip.forEach((relativePath, file) => {
+        if (relativePath.toLowerCase().endsWith('.csv') && !file.dir) {
+          const promise = file.async('string').then(content => {
+            csvFiles.push({
+              id: crypto.randomUUID(),
+              filename: relativePath,
+              content: content
+            });
+          });
+          filePromises.push(promise);
+        }
+      });
+
+      await Promise.all(filePromises);
+      return csvFiles;
+    } catch (err) {
+      console.error('Error loading CSV files from zip:', err);
+      return [];
+    }
   },
 
   /**

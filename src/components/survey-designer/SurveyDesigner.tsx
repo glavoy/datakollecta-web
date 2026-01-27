@@ -114,8 +114,8 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
       id: crypto.randomUUID(),
       surveyId: `survey_${Date.now()}`,
       name: 'New Survey Package',
-      version: '1.0',
       forms: [createDefaultForm()],
+      csvFiles: [],
     }
   );
 
@@ -168,10 +168,11 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
     try {
       setIsSaving(true);
 
-      // Generate survey name and display name
-      const date = new Date().toISOString().split('T')[0].replace(/-/g, '_');
+      // Use surveyId from the package (which includes version info like geoff_css_2026-01-24)
+      // If surveyId is empty, generate one from the display name
       const surveyDisplayName = surveyPackage.name || 'New Survey';
-      const surveyName = surveyDisplayName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_' + date;
+      const surveyName = surveyPackage.surveyId ||
+        surveyDisplayName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
       await surveyService.saveSurveyPackage(
         surveyPackage,
@@ -297,7 +298,9 @@ const SurveyDesigner = ({ initialPackage, onSave, projectId, userId }: SurveyDes
           >
             {surveyPackage.name || 'Untitled Survey'}
           </div>
-          <Badge variant="outline">v{surveyPackage.version}</Badge>
+          {surveyPackage.surveyId && (
+            <Badge variant="outline">{surveyPackage.surveyId}</Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button

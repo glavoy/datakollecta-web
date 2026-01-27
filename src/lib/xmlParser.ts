@@ -28,9 +28,15 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
   const questions = Array.isArray(survey.question) ? survey.question : [survey.question];
 
   return questions.map((q: any) => {
+    // Map 'automatic' to 'calculated' for backward compatibility with older XML files
+    let questionType = String(q.type).trim();
+    if (questionType === 'automatic') {
+      questionType = 'calculated';
+    }
+
     const question: SurveyQuestion = {
       id: crypto.randomUUID(),
-      type: String(q.type).trim() as QuestionType,
+      type: questionType as QuestionType,
       fieldname: String(q.fieldname).trim(),
       fieldtype: String(q.fieldtype).trim() as FieldType,
       text: typeof q.text === 'string' ? q.text.trim() : (q.text && q.text['#text'] ? String(q.text['#text']).trim() : ""),
@@ -54,7 +60,9 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
           table: q.responses.table,
           displayColumn: q.responses.display?.column || "",
           valueColumn: q.responses.value?.column || "",
-          filters: []
+          filters: [],
+          distinct: q.responses.distinct === 'true' || q.responses.distinct === true,
+          emptyMessage: q.responses.empty_message,
         };
 
         if (q.responses.filter) {
@@ -65,15 +73,32 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
             value: f.value
           }));
         }
-        
+
+        // Handle not_in_list option
+        if (q.responses.not_in_list) {
+          dynamic.notInList = {
+            value: String(q.responses.not_in_list.value || '-99'),
+            label: q.responses.not_in_list.label || 'Not in list'
+          };
+        }
+
+        // Handle dont_know option for dynamic responses
+        if (q.responses.dont_know) {
+          dynamic.dontKnow = {
+            value: String(q.responses.dont_know.value || '-7'),
+            label: q.responses.dont_know.label || "Don't know"
+          };
+        }
+
         question.dynamicResponses = dynamic;
       } else if (q.responses.response) {
         // Static responses
         const responses = Array.isArray(q.responses.response) ? q.responses.response : [q.responses.response];
         question.responses = responses.map((r: any) => ({
           id: crypto.randomUUID(),
-          value: String(r.value),
-          label: r["#text"] || r.label || ""
+          value: String(r.value ?? ''),
+          // Use nullish coalescing to handle 0 correctly (0 is falsy but valid)
+          label: String(r["#text"] ?? r.label ?? "")
         }));
       }
     }
@@ -148,6 +173,20 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
         separator: q.calculation.separator,
       };
 
+      // Handle query type calculations (SQL)
+      if (q.calculation.sql) {
+        calc.sql = q.calculation.sql;
+        if (q.calculation.parameter) {
+          const params = Array.isArray(q.calculation.parameter)
+            ? q.calculation.parameter
+            : [q.calculation.parameter];
+          calc.params = params.map((p: any) => ({
+            name: p.name,
+            field: p.field
+          }));
+        }
+      }
+
       if (q.calculation.when) {
         const whens = Array.isArray(q.calculation.when) ? q.calculation.when : [q.calculation.when];
         calc.cases = whens.map((w: any) => ({
@@ -163,6 +202,15 @@ export const parseSurveyXml = (xmlContent: string): SurveyQuestion[] => {
       }
 
       question.calculation = calc;
+    }
+
+    // Handle Don't Know and Refuse special values
+    if (q.dont_know) {
+      question.dontKnow = String(q.dont_know);
+    }
+
+    if (q.refuse) {
+      question.refuse = String(q.refuse);
     }
 
     return question;

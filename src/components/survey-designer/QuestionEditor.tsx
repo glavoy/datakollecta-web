@@ -320,7 +320,7 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
                 </div>
               )}
 
-              {/* Don't Know / Refuse / NA options - for applicable types */}
+              {/* Don't Know / Refuse options - for applicable types */}
               {config.showDontKnowRefuseNa && (
                 <>
                   <Separator className="my-4" />
@@ -328,7 +328,7 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
                   <p className="text-xs text-muted-foreground mb-3">
                     Add standard response options for respondents who cannot or choose not to answer.
                   </p>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs">Don't Know</Label>
                       <Input
@@ -343,14 +343,6 @@ const QuestionEditor = ({ question, allQuestions, open, onOpenChange, onSave }: 
                         value={editedQuestion.refuse ?? ''}
                         onChange={(e) => update('refuse', e.target.value || undefined)}
                         placeholder="-8"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Not Applicable</Label>
-                      <Input
-                        value={editedQuestion.na ?? ''}
-                        onChange={(e) => update('na', e.target.value || undefined)}
-                        placeholder="-6"
                       />
                     </div>
                   </div>
