@@ -26,9 +26,6 @@ const Header = () => {
           <Button variant="ghost" asChild>
             <Link to="/login">Sign In</Link>
           </Button>
-          <Button asChild>
-            <Link to="/app/projects">Get Started</Link>
-          </Button>
         </div>
       </div>
     </header>
